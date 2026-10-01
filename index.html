@@ -1,0 +1,1770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FHE Accelerator Simulators 02 — Anatomy of CKKS Bootstrapping</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&family=Geist+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1c1815;
+            --bg-card: #231e1a;
+            --bg-code: #2b2520;
+            --text-primary: #efe8dc;
+            --text-secondary: #a2978b;
+            --accent: #aabd59;
+            --accent-dim: #aabd5944;
+            --accent-glow: #aabd5933;
+            --border: #3a322b;
+            --font-display: 'Bricolage Grotesque', sans-serif;
+            --font-mono: 'Geist Mono', 'Geist Mono', monospace;
+            --font-body: 'Instrument Sans', sans-serif;
+            --max-width: 900px;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 17px;
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        /* ── Header ── */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .hero > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .series-label {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        .hero h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+            margin-bottom: 1rem;
+        }
+
+        .hero h1 .accent {
+            color: var(--accent);
+        }
+
+        .hero .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin-bottom: 2rem;
+        }
+
+        /* ── Tag Pills ── */
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .tag {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            background: var(--accent-dim);
+            white-space: nowrap;
+        }
+
+        /* ── Pipeline Flow Bar ── */
+        .pipeline {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            margin-bottom: 1rem;
+            max-width: var(--max-width);
+        }
+
+        .pipeline-step {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.3rem 0.7rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .pipeline-arrow {
+            color: var(--accent);
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        /* ── Slides ── */
+        .slide {
+            min-height: 100vh;
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 4rem 1.5rem;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .slide-number {
+            font-family: var(--font-display);
+            font-size: 5rem;
+            font-weight: 700;
+            color: var(--accent-dim);
+            position: absolute;
+            top: 2rem;
+            right: 1.5rem;
+            line-height: 1;
+            user-select: none;
+        }
+
+        .slide h2 {
+            font-family: var(--font-display);
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 1.5rem;
+            line-height: 1.25;
+        }
+
+        .slide h3 {
+            font-family: var(--font-display);
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .slide p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        .slide p strong {
+            color: var(--text-primary);
+        }
+
+        .slide ul, .slide ol {
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        .slide li {
+            margin-bottom: 0.4rem;
+        }
+
+        .slide li strong {
+            color: var(--text-primary);
+        }
+
+        /* ── Code Blocks ── */
+        .code-block {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin: 1.25rem 0;
+            overflow: hidden;
+        }
+
+        .code-header {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            background: rgba(170,189,89,0.08);
+            padding: 0.4rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .code-block pre {
+            margin: 0;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+
+        .code-block code {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #dad1c5;
+        }
+
+        /* Syntax highlighting (manual) */
+        .kw { color: #de805a; }
+        .fn { color: #d7bbdf; }
+        .str { color: #bcdbd4; }
+        .cm { color: #a2978b; font-style: italic; }
+        .num { color: #97cdc6; }
+        .type { color: #e3b174; }
+        .dir { color: #de805a; }
+        .mac { color: #e3b174; }
+
+        /* ── Tables ── */
+        .table-wrap {
+            overflow-x: auto;
+            margin: 1.25rem 0;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: var(--bg-code);
+            color: var(--accent);
+            font-weight: 600;
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-family: var(--font-display);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:nth-child(even) td {
+            background: rgba(35,30,26,0.5);
+        }
+
+        /* ── Diagrams ── */
+        .diagram-flow {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .diagram-box {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .diagram-box.accent {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(170,189,89,0.08);
+        }
+
+        .diagram-box.dim {
+            color: var(--text-secondary);
+            border-color: var(--border);
+        }
+
+        .diagram-arrow {
+            color: var(--accent);
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        /* Vertical flow diagrams */
+        .diagram-vertical {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.3rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .diagram-vertical .diagram-arrow {
+            font-size: 1.1rem;
+        }
+
+        /* Nested hierarchy diagram */
+        .hierarchy {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .hierarchy-level {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .hierarchy-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            min-width: 80px;
+            text-align: right;
+        }
+
+        .hierarchy-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+
+        .hierarchy-item {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .hierarchy-item.accent {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(170,189,89,0.08);
+        }
+
+        /* Grid diagram */
+        .diagram-grid {
+            display: grid;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .diagram-grid.cols-2 {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .diagram-grid.cols-3 {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        .diagram-panel {
+            padding: 1rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+
+        .diagram-panel.accent-border {
+            border-left: 3px solid var(--accent);
+        }
+
+        .diagram-panel h4 {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+
+        .diagram-panel p, .diagram-panel ul {
+            font-size: 0.85rem;
+        }
+
+        /* ── Callout Boxes ── */
+        .callout {
+            background: var(--bg-card);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            padding: 1rem 1.25rem;
+            margin: 1.25rem 0;
+        }
+
+        .callout p {
+            margin-bottom: 0;
+        }
+
+        .callout .callout-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.3rem;
+        }
+
+        /* ── Tier Visual ── */
+        .tier-visual {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .tier-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .tier-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            min-width: 90px;
+            text-align: right;
+        }
+
+        .tier-fill {
+            height: 32px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            padding: 0 0.75rem;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            white-space: nowrap;
+            transition: width 0.6s ease;
+        }
+
+        .tier-cost {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            min-width: 70px;
+        }
+
+        /* ── Contents list ── */
+        .contents-list {
+            list-style: none;
+            padding-left: 0;
+            counter-reset: contents;
+        }
+
+        .contents-list li {
+            counter-increment: contents;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .contents-list li:last-child {
+            border-bottom: none;
+        }
+
+        .contents-list li::before {
+            content: counter(contents, decimal-leading-zero);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            min-width: 2rem;
+        }
+
+        .contents-list a {
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .contents-list a:hover {
+            color: var(--accent);
+        }
+
+        /* ── Footer ── */
+        .footer {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+            max-width: var(--max-width);
+            margin: 0 auto;
+        }
+
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 640px) {
+            .slide {
+                padding: 3rem 1rem;
+                min-height: auto;
+            }
+
+            .slide-number {
+                font-size: 3rem;
+                top: 1.5rem;
+                right: 1rem;
+            }
+
+            .slide h2 {
+                font-size: 1.5rem;
+            }
+
+            .diagram-grid.cols-2,
+            .diagram-grid.cols-3 {
+                grid-template-columns: 1fr;
+            }
+
+            .pipeline {
+                gap: 0.15rem;
+            }
+
+            .pipeline-step {
+                font-size: 0.6rem;
+                padding: 0.2rem 0.4rem;
+            }
+
+            .hero h1 {
+                font-size: 1.8rem;
+            }
+
+            table {
+                font-size: 0.78rem;
+            }
+
+            .tier-label {
+                min-width: 60px;
+                font-size: 0.65rem;
+            }
+
+            .tier-fill {
+                font-size: 0.6rem;
+                height: 26px;
+            }
+        }
+
+        /* ── Interactive controls (added for Local LLM series) ── */
+        .control-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin: 1.25rem 0;
+        }
+        .control-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .control-row label {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            min-width: 180px;
+        }
+        .control-row input[type="range"] {
+            flex: 1;
+            min-width: 160px;
+            accent-color: var(--accent);
+        }
+        .control-row input[type="number"],
+        .control-row select {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            border-radius: 4px;
+            padding: 0.3rem 0.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+        .control-row .val {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            min-width: 80px;
+            text-align: right;
+        }
+        .btn {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            padding: 0.4rem 0.9rem;
+            background: var(--accent-dim);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        .btn:hover { background: rgba(170,189,89,0.2); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn.secondary {
+            background: var(--bg-code);
+            color: var(--text-secondary);
+            border-color: var(--border);
+        }
+        .result-box {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 4px;
+            padding: 0.75rem 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            margin-top: 0.75rem;
+        }
+        .result-box .line-label { color: var(--text-secondary); }
+        .result-box .line-val   { color: var(--accent); font-weight: 600; }
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+        .metric {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.6rem 0.8rem;
+            text-align: center;
+        }
+        .metric .metric-label {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        .metric .metric-value {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            color: var(--accent);
+            font-weight: 600;
+            margin-top: 0.2rem;
+        }
+
+        /* Canvas / SVG containers */
+        .canvas-wrap {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.25rem 0;
+            overflow-x: auto;
+        }
+        .canvas-wrap canvas,
+        .canvas-wrap svg {
+            display: block;
+            margin: 0 auto;
+            max-width: 100%;
+        }
+
+        /* Small inline badge */
+        .badge {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            padding: 0.1rem 0.45rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            vertical-align: middle;
+            margin-left: 0.3rem;
+        }
+        .badge.ok    { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+        .badge.warn  { border-color: #e3b174; color: #e3b174; background: rgba(227,177,116,0.08); }
+        .badge.bad   { border-color: #de805a; color: #de805a; background: rgba(222,128,90,0.08); }
+
+
+        /* ── LLM Inference Simulators additions ── */
+        .canvas-wrap canvas { image-rendering: auto; display: block; width: 100%; height: auto; }
+        .canvas-wrap svg { max-width: 100%; height: auto; }
+        .ladder { display: grid; gap: 0.4rem; margin: 1.25rem 0; }
+        .ladder-row {
+            display: grid; grid-template-columns: 11rem 1fr 7.5rem; gap: 0.75rem; align-items: center;
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+            padding: 0.55rem 0.85rem; font-size: 0.88rem;
+        }
+        .ladder-row .rung { font-family: var(--font-display); font-weight: 600; color: var(--accent); }
+        .ladder-row .speed { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-secondary); text-align: right; }
+        .res-list { list-style: none; padding: 0; margin: 0.75rem 0; }
+        .res-list li { padding: 0.6rem 0; border-bottom: 1px solid var(--border); font-size: 0.92rem; }
+        .res-list li:last-child { border-bottom: none; }
+        .res-list .what { color: var(--text-secondary); display: block; font-size: 0.86rem; margin-top: 0.15rem; }
+        .res-list a { color: var(--accent); text-decoration: none; }
+        .res-list a:hover { text-decoration: underline; }
+        .qa { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; margin: 0.6rem 0; padding: 0.2rem 1rem; }
+        .qa summary { cursor: pointer; padding: 0.6rem 0; font-weight: 600; }
+        .qa p, .qa ul { margin-bottom: 0.75rem; font-size: 0.92rem; }
+        .sim-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.4rem 1.25rem; }
+        .chart-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+        .chart-title { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.3rem; }
+        .slide a { color: var(--accent); }
+        @media (max-width: 640px) {
+            .ladder-row { grid-template-columns: 1fr; gap: 0.2rem; }
+            .ladder-row .speed { text-align: left; }
+        }
+    </style>
+</head>
+<body>
+
+<header class="hero">
+    <div class="series-label">FHE Accelerator Simulators &mdash; Presentation 02</div>
+    <h1>Anatomy of CKKS <span class="accent">Bootstrapping</span></h1>
+    <p class="subtitle">ModRaise, CoeffToSlot (a homomorphic DFT evaluated with baby-step giant-step rotations), EvalMod (a polynomial approximation of modular reduction) and SlotToCoeff, with exact operation counts per stage, where the levels go, and the data-movement profile that makes bootstrapping a memory problem.</p>
+
+    <div class="tags">
+        <span class="tag">ModRaise</span>
+        <span class="tag">CoeffToSlot</span>
+        <span class="tag">EvalMod</span>
+        <span class="tag">SlotToCoeff</span>
+        <span class="tag">BSGS</span>
+        <span class="tag">Levels</span>
+    </div>
+
+    <div class="pipeline">
+        <span class="pipeline-step">ModRaise</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">CoeffToSlot</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">EvalMod</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">SlotToCoeff</span>
+    </div>
+</header>
+
+<section class="slide" id="slide-00">
+    <div class="slide-number">00</div>
+    <h2>Topics We'll Cover</h2>
+    <ul class="contents-list">
+        <li><a href="#slide-01">Why Bootstrap, and the Four Steps</a></li>
+        <li><a href="#slide-02">ModRaise</a></li>
+        <li><a href="#slide-03">CoeffToSlot: A Homomorphic DFT</a></li>
+        <li><a href="#slide-04">Baby-Step Giant-Step Rotations</a></li>
+        <li><a href="#slide-05">EvalMod: Modular Reduction as a Polynomial</a></li>
+        <li><a href="#slide-06">SlotToCoeff</a></li>
+        <li><a href="#slide-07">Where the Levels Go</a></li>
+        <li><a href="#slide-08">Operation Counts per Stage</a></li>
+        <li><a href="#slide-09">The Data-Movement Profile</a></li>
+        <li><a href="#slide-10">Interactive: Stage Breakdown</a></li>
+        <li><a href="#slide-11">Algorithmic Levers</a></li>
+        <li><a href="#slide-12">What to Take Away</a></li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-01">
+    <div class="slide-number">01</div>
+    <h2>Why Bootstrap, and the Four Steps</h2>
+    <p>Each multiplication consumes a level (deck 01). When a ciphertext reaches level 0 it cannot be multiplied again. <strong>Bootstrapping</strong> homomorphically evaluates (an approximation of) decryption to produce an equivalent ciphertext at a high level. For CKKS the standard pipeline is that of Cheon, Han, Kim, Kim and Song (EUROCRYPT 2018, <a href="https://eprint.iacr.org/2018/153">ePrint 2018/153</a>), refined by Han &amp; Ki (<a href="https://eprint.iacr.org/2019/688">ePrint 2019/688</a>) and Bossuat et al. (EUROCRYPT 2021, <a href="https://eprint.iacr.org/2020/1203">ePrint 2020/1203</a>):</p>
+    <div class="canvas-wrap">
+        <svg viewBox="0 0 720 170" width="720" height="170" xmlns="http://www.w3.org/2000/svg">
+            <style>
+                .b  { fill: #2b2520; stroke: #aabd59; }
+                .m  { fill: #2b2520; stroke: #e3b174; }
+                .t  { fill: #efe8dc; font-family: 'Geist Mono', monospace; font-size: 10.5px; }
+                .d  { fill: #a2978b; font-family: 'Geist Mono', monospace; font-size: 9.5px; }
+                .a  { stroke: #aabd59; stroke-width: 1.3; fill: none; marker-end: url(#m2); }
+            </style>
+            <defs><marker id="m2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#aabd59"/></marker></defs>
+            <rect x="10" y="40" width="120" height="60" rx="4" class="b"/><text x="20" y="62" class="t">ModRaise</text><text x="20" y="78" class="d">level 0 &#8594; L</text><text x="20" y="92" class="d">0 levels</text>
+            <rect x="165" y="40" width="160" height="60" rx="4" class="m"/><text x="175" y="62" class="t">CoeffToSlot</text><text x="175" y="78" class="d">homomorphic DFT (BSGS)</text><text x="175" y="92" class="d">3 levels, 43 rotations</text>
+            <rect x="360" y="40" width="160" height="60" rx="4" class="b"/><text x="370" y="62" class="t">EvalMod</text><text x="370" y="78" class="d">approximate x mod q0</text><text x="370" y="92" class="d">10 levels, 36 HMults</text>
+            <rect x="555" y="40" width="155" height="60" rx="4" class="m"/><text x="565" y="62" class="t">SlotToCoeff</text><text x="565" y="78" class="d">inverse DFT (BSGS)</text><text x="565" y="92" class="d">3 levels, 42 rotations</text>
+            <path class="a" d="M130 70 L163 70"/><path class="a" d="M325 70 L358 70"/><path class="a" d="M520 70 L553 70"/>
+            <text x="10" y="130" class="t">ark set (N = 2^16, L = 23, dnum = 4), full slots: 16 levels spent, 7 left for the application.</text>
+            <text x="10" y="148" class="d">Counts from the companion trace generator; ARK reports 15 levels for its own bootstrap at these parameters.</text>
+        </svg>
+    </div>
+    <p>The orange stages are rotation-heavy and key-hungry; EvalMod is multiplication-heavy and reuses one relinearisation key. That difference drives everything in decks 03&ndash;05.</p>
+</section>
+
+<section class="slide" id="slide-02">
+    <div class="slide-number">02</div>
+    <h2>ModRaise</h2>
+    <ul>
+        <li><strong>What:</strong> reinterpret a level-0 ciphertext (one limb, modulus q<sub>0</sub>) modulo the full Q. Decrypting it now gives m + q<sub>0</sub>&middot;I for a small integer polynomial I; the rest of bootstrapping exists to remove q<sub>0</sub>&middot;I.</li>
+        <li><strong>Cost:</strong> cheap. iNTT the single limb of both polynomials, then NTT the coefficients into all L+1 limbs: 2 + 2(L+1) = <strong>50</strong> limb transforms for the ark set, no key switch.</li>
+        <li><strong>Sparse packing:</strong> with fewer slots than N/2, a <em>SubSum</em> of log<sub>2</sub>(N/2 / slots) rotations follows. OpenFHE's 8-slot configuration in our calibration does 12 of them.</li>
+    </ul>
+    <div class="callout">
+        <div class="callout-label">Ordering variants</div>
+        <p>Some implementations run SlotToCoeff <em>first</em>, at the bottom of the level ladder, where ciphertexts are small and the DFT is cheap. The companion model uses the ModRaise &rarr; CoeffToSlot &rarr; EvalMod &rarr; SlotToCoeff order described in ARK. The ordering changes the levels at which the expensive rotations run, and so changes the byte counts.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-03">
+    <div class="slide-number">03</div>
+    <h2>CoeffToSlot: A Homomorphic DFT</h2>
+    <p>Encoding uses a DFT-like map (the canonical embedding). To operate on the polynomial's <em>coefficients</em>, which is where q<sub>0</sub>&middot;I lives, bootstrapping applies the inverse encoding map homomorphically.</p>
+    <ul>
+        <li><strong>As a matrix,</strong> the map is dense, (N/2)&times;(N/2). Evaluated naively through its diagonals it would need N/2 rotations.</li>
+        <li><strong>FFT factorisation:</strong> like any FFT it factors into log<sub>2</sub>(N/2) = 15 sparse stages. Merging stages into a radix-2<sup>k</sup> step gives 2<sup>k+1</sup>&minus;1 non-zero diagonals per step, at one level per step.</li>
+        <li><strong>The trade-off:</strong> the ark set merges 15 stages into 3 levels of radix 2<sup>5</sup>, giving 63 diagonals per level. Fewer levels means more rotations per level; more levels means fewer rotations but fewer levels left for the application.</li>
+        <li>Each diagonal is a <strong>plaintext</strong> (12 MiB at the top level) that is multiplied in, and each rotation needs its own <strong>evaluation key</strong>.</li>
+    </ul>
+    <p>ARK (<a href="https://arxiv.org/abs/2205.00922">arXiv:2205.00922</a>) quotes the same structure: with k = 5 over 3 levels, "40 HRots and 158 PMults" per homomorphic DFT. The companion model, without ARK's further optimisations, does 43 and 189.</p>
+</section>
+
+<section class="slide" id="slide-04">
+    <div class="slide-number">04</div>
+    <h2>Baby-Step Giant-Step Rotations</h2>
+    <p>A matrix-vector product with d diagonals needs d rotations if done directly. BSGS splits d = n<sub>1</sub> &times; n<sub>2</sub>: rotate the input n<sub>1</sub>&minus;1 times (baby steps), form n<sub>2</sub> inner sums with pre-rotated diagonals, and rotate each sum once (giant steps).</p>
+    <div class="canvas-wrap">
+        <svg viewBox="0 0 720 200" width="720" height="200" xmlns="http://www.w3.org/2000/svg">
+            <style>
+                .b  { fill: #2b2520; stroke: #aabd59; }
+                .g  { fill: #2b2520; stroke: #e3b174; }
+                .p  { fill: rgba(151,205,198,0.12); stroke: #97cdc6; }
+                .t  { fill: #efe8dc; font-family: 'Geist Mono', monospace; font-size: 10px; }
+                .d  { fill: #a2978b; font-family: 'Geist Mono', monospace; font-size: 9px; }
+                .a  { stroke: #a2978b; stroke-width: 1; fill: none; }
+            </style>
+            <rect x="10" y="80" width="70" height="36" rx="4" class="b"/><text x="20" y="102" class="t">input x</text>
+            <g>
+                <rect x="120" y="20" width="90" height="26" rx="4" class="b"/><text x="128" y="37" class="t">rot(x, 1)</text>
+                <rect x="120" y="54" width="90" height="26" rx="4" class="b"/><text x="128" y="71" class="t">rot(x, 2)</text>
+                <text x="150" y="100" class="t">&#8942;</text>
+                <rect x="120" y="120" width="90" height="26" rx="4" class="b"/><text x="128" y="137" class="t">rot(x, 7)</text>
+            </g>
+            <text x="100" y="166" class="d">7 baby steps, one shared ModUp</text>
+            <g>
+                <rect x="290" y="20" width="160" height="26" rx="4" class="p"/><text x="298" y="37" class="t">&#931; pt(0,i) &#183; rot(x,i)</text>
+                <rect x="290" y="54" width="160" height="26" rx="4" class="p"/><text x="298" y="71" class="t">&#931; pt(1,i) &#183; rot(x,i)</text>
+                <text x="365" y="100" class="t">&#8942;</text>
+                <rect x="290" y="120" width="160" height="26" rx="4" class="p"/><text x="298" y="137" class="t">&#931; pt(7,i) &#183; rot(x,i)</text>
+            </g>
+            <text x="290" y="166" class="d">8 inner sums: 63 PMults</text>
+            <g>
+                <rect x="510" y="54" width="110" height="26" rx="4" class="g"/><text x="518" y="71" class="t">rot(&#183;, 8j)</text>
+                <rect x="640" y="70" width="70" height="36" rx="4" class="b"/><text x="650" y="92" class="t">&#931; &#8594; out</text>
+            </g>
+            <text x="520" y="166" class="d">7 giant steps</text>
+            <path class="a" d="M80 98 L118 33"/><path class="a" d="M80 98 L118 67"/><path class="a" d="M80 98 L118 133"/>
+            <path class="a" d="M210 33 L288 33"/><path class="a" d="M210 67 L288 67"/><path class="a" d="M210 133 L288 133"/>
+            <path class="a" d="M450 33 L508 67"/><path class="a" d="M450 67 L508 67"/><path class="a" d="M450 133 L508 67"/>
+            <path class="a" d="M620 67 L638 88"/>
+            <text x="10" y="192" class="t">one radix-2^5 level: 14 rotations and 63 PMults instead of 62 rotations</text>
+        </svg>
+    </div>
+    <ul>
+        <li><strong>Hoisting</strong> (Halevi &amp; Shoup, CRYPTO 2018, <a href="https://eprint.iacr.org/2018/244">ePrint 2018/244</a>): the baby steps rotate the <em>same</em> ciphertext, so its decomposition and ModUp are done once and shared, which saves NTTs. The keys are still all different.</li>
+        <li><strong>Every rotation amount is a distinct key</strong>: 14 keys per level here, 43 across CoeffToSlot. This is the pattern ARK's Min-KS attacks (slide 11).</li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-05">
+    <div class="slide-number">05</div>
+    <h2>EvalMod: Modular Reduction as a Polynomial</h2>
+    <p>After CoeffToSlot the slots hold the coefficients t = m + q<sub>0</sub>&middot;I (scaled). EvalMod computes t mod q<sub>0</sub>, which is not a polynomial, so it is approximated: (q<sub>0</sub>/2&pi;)&middot;sin(2&pi;t/q<sub>0</sub>) is close to t mod q<sub>0</sub> when m is small. In practice this means a scaled cosine evaluated with Chebyshev polynomials, followed by <strong>double-angle</strong> steps cos(2x) = 2cos<sup>2</sup>x &minus; 1.</p>
+    <div class="table-wrap">
+    <table>
+        <tr><th>Step (one copy, ark set)</th><th>HMults</th><th>Levels</th></tr>
+        <tr><td>Scale into the approximation interval (a constant multiply)</td><td>0</td><td>1</td></tr>
+        <tr><td>Baby powers T<sub>2</sub>&hellip;T<sub>8</sub> (degree 59 &rarr; b = 8)</td><td>7</td><td>3</td></tr>
+        <tr><td>Giant powers T<sub>16</sub>, T<sub>32</sub></td><td>2</td><td>(in parallel)</td></tr>
+        <tr><td>8 baby polynomials (constant multiply-adds), then combine (g = 8)</td><td>7</td><td>1 + 3</td></tr>
+        <tr><td>2 double-angle steps</td><td>2</td><td>2</td></tr>
+        <tr><td><strong>Total per copy</strong></td><td><strong>18</strong></td><td><strong>10</strong></td></tr>
+    </table>
+    </div>
+    <ul>
+        <li><strong>Two copies for full slots.</strong> After CoeffToSlot a conjugation (one more rotation) splits the real and imaginary parts, and EvalMod runs on each: 36 HMults in total.</li>
+        <li><strong>One key, reused 36 times:</strong> the relinearisation key. EvalMod is NTT-heavy and cache-friendly, the opposite of the DFT stages.</li>
+        <li>The degree, the double-angle count and the use of a sine or cosine are accuracy choices; libraries differ (OpenFHE's sparse configuration in our calibration uses degree 119 and three double-angle steps).</li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-06">
+    <div class="slide-number">06</div>
+    <h2>SlotToCoeff</h2>
+    <ul>
+        <li><strong>What:</strong> the forward encoding DFT, homomorphically, taking the corrected coefficients back to slots. It has the same BSGS structure as CoeffToSlot: 3 levels, 42 rotations (no conjugation) and 189 plaintext multiplies in the ark set.</li>
+        <li><strong>Cheaper per operation:</strong> it runs after EvalMod, at levels 10 down to 8, where a key needs only 2 of its 4 digits and 15&ndash;17 of its 30 limbs. Its key traffic is 1.41 GB against 5.22 GB for CoeffToSlot.</li>
+        <li><strong>Why ordering matters:</strong> moving the expensive DFT to the bottom of the level ladder is a standard optimisation. It changes the data-movement profile far more than it changes the operation count.</li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-07">
+    <div class="slide-number">07</div>
+    <h2>Where the Levels Go</h2>
+    <div class="table-wrap">
+    <table>
+        <tr><th>Parameter set</th><th>L</th><th>CoeffToSlot</th><th>EvalMod</th><th>SlotToCoeff</th><th>Used by bootstrap</th><th>Left for the application</th></tr>
+        <tr><td>ark</td><td>23</td><td>3</td><td>10</td><td>3</td><td>16</td><td>7</td></tr>
+        <tr><td>lattigo</td><td>24</td><td>3</td><td>10</td><td>3</td><td>16</td><td>8</td></tr>
+        <tr><td>gpu100x</td><td>34</td><td>3</td><td>10</td><td>3</td><td>16</td><td>18</td></tr>
+        <tr><td>openfhe-sparse (8 slots)</td><td>18</td><td>1</td><td>12</td><td>1</td><td>14</td><td>4</td></tr>
+    </table>
+    </div>
+    <ul>
+        <li><strong>Bootstrapping is expensive per useful level.</strong> With 7 levels left, a deep computation bootstraps every 7 multiplications. The cost per useful level is the number that matters to applications (ARK and 100x use an amortised metric, T<sub>A.S.</sub>, for this reason).</li>
+        <li><strong>Bigger L buys more useful levels</strong> but makes every ciphertext, key and transform bigger, and pushes up PQ against the security bound.</li>
+        <li>These level counts come from the companion trace generator, and a test checks them against the closed form CtS + (2 + &lceil;log<sub>2</sub>(b&minus;1)&rceil; + &lceil;log<sub>2</sub>g&rceil; + r) + StC.</li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-08">
+    <div class="slide-number">08</div>
+    <h2>Operation Counts per Stage</h2>
+    <p>One full-slot bootstrap of the ark set, baseline algorithm (hoisted BSGS). "Requested" bytes are what the operations need, before any on-chip reuse; deck 03 turns them into actual HBM traffic.</p>
+    <div class="table-wrap">
+    <table>
+        <tr><th>Stage</th><th>HE ops</th><th>HMult</th><th>HRot</th><th>PMult</th><th>Distinct keys</th><th>NTT + iNTT limbs</th><th>Key GB requested</th><th>Plaintext GB requested</th></tr>
+        <tr><td>ModRaise</td><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td><td>50</td><td>0.00</td><td>0.00</td></tr>
+        <tr><td>CoeffToSlot</td><td>75</td><td>0</td><td>43</td><td>189</td><td>43</td><td>5,520</td><td>5.22</td><td>2.28</td></tr>
+        <tr><td>EvalMod</td><td>55</td><td>36</td><td>0</td><td>0</td><td>1</td><td>5,968</td><td>2.66</td><td>0.00</td></tr>
+        <tr><td>SlotToCoeff</td><td>72</td><td>0</td><td>42</td><td>189</td><td>42</td><td>2,172</td><td>1.41</td><td>0.99</td></tr>
+    </table>
+    </div>
+    <ul>
+        <li><strong>203 HE operations, 85 rotations, 36 multiplications, 378 plaintext multiplies</strong> and 13,710 limb transforms (7.2 billion butterflies) per bootstrap.</li>
+        <li>EvalMod has the most transforms, but its 2.66 GB of key requests are all the <em>same</em> key; the DFT stages' 6.6 GB are 85 different keys.</li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-09">
+    <div class="slide-number">09</div>
+    <h2>The Data-Movement Profile</h2>
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>DFT stages: streaming</h4>
+            <ul>
+                <li>Every key is used once per bootstrap: compulsory traffic, whatever the SRAM size.</li>
+                <li>Every diagonal plaintext is used once: more compulsory traffic, unless it is generated on chip.</li>
+                <li>Arithmetic per byte is low. On the ARK-class model CoeffToSlot takes 72% of the bootstrap and is HBM-bound (deck 03).</li>
+            </ul>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>EvalMod: compute</h4>
+            <ul>
+                <li>One key, reused; ciphertexts are reused across the polynomial evaluation tree.</li>
+                <li>NTT- and base-conversion-heavy. On the same model it takes 10% of the time and its hot-spot is the multiply-add lanes.</li>
+                <li>The 2&ndash;3 live ciphertexts and the key fit in a few hundred MiB of SRAM.</li>
+            </ul>
+        </div>
+    </div>
+    <div class="callout">
+        <div class="callout-label">The consequence</div>
+        <p>A bootstrap alternates between a bandwidth-bound phase and a compute-bound phase, so no single roofline point describes it. That is the reason to simulate it as a sequence of operations rather than estimate it from totals. The analytic bound in deck 03 is 28% below the simulated time for exactly this reason.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-10">
+    <div class="slide-number">10</div>
+    <h2>Interactive: Stage Breakdown</h2>
+    <p>"All three" is Min-KS + seeded keys + on-the-fly plaintexts (slide 11). This runs the simulator's trace generator in the browser (the same JavaScript that powers deck 03) and counts operations and requested bytes per stage. No timing here, only the workload.</p>
+    <div class="control-panel">
+        <div class="sim-grid">
+            <div class="control-row"><label for="sb-n">log<sub>2</sub> N</label><input type="range" id="sb-n" min="12" max="17" value="16"><span class="val" id="sb-n-val">16</span></div>
+            <div class="control-row"><label for="sb-l">L</label><input type="range" id="sb-l" min="12" max="45" value="23"><span class="val" id="sb-l-val">23</span></div>
+            <div class="control-row"><label for="sb-d">dnum</label><input type="range" id="sb-d" min="1" max="12" value="4"><span class="val" id="sb-d-val">4</span></div>
+            <div class="control-row"><label for="sb-c">CoeffToSlot levels</label><input type="range" id="sb-c" min="1" max="5" value="3"><span class="val" id="sb-c-val">3</span></div>
+            <div class="control-row"><label for="sb-s">SlotToCoeff levels</label><input type="range" id="sb-s" min="1" max="5" value="3"><span class="val" id="sb-s-val">3</span></div>
+            <div class="control-row"><label for="sb-deg">EvalMod degree</label><select id="sb-deg"><option>15</option><option>31</option><option selected>59</option><option>119</option></select></div>
+            <div class="control-row"><label for="sb-r">Double-angle steps</label><input type="range" id="sb-r" min="0" max="3" value="2"><span class="val" id="sb-r-val">2</span></div>
+            <div class="control-row"><label for="sb-slots">Slots</label><select id="sb-slots"><option value="full" selected>full (N/2)</option><option value="3">8 (sparse)</option><option value="10">1,024</option></select></div>
+            <div class="control-row"><label for="sb-alg">Algorithm</label><select id="sb-alg" style="max-width:100%"><option value="base" selected>baseline</option><option value="nohoist">no hoisting</option><option value="minks">Min-KS</option><option value="all">all three</option></select></div>
+        </div>
+        <div class="metric-grid" id="sb-m"></div>
+        <div class="chart-title" style="margin-top:0.75rem;">per stage: limb transforms (green), key GB requested (orange), plaintext GB requested (teal); bars scaled to the largest value in each colour</div>
+        <div class="canvas-wrap" style="padding:0.4rem;"><canvas id="sb-c1" width="900" height="300"></canvas></div>
+        <div class="result-box" id="sb-r1"></div>
+    </div>
+    <script id="sim-engine">
+// fhe-sim, JavaScript port of FHE_Accelerator_Sim (SimPy).
+// Same parameter sets, the same bootstrap trace generator, cost model, scratchpad,
+// event engine and metrics. A ~100-line SimPy core (events, processes as generators,
+// Resource with SimPy's request/release ordering) stands in for SimPy, so the results
+// match the Python package bit for bit (tests/test_simulator.py checks this).
+(function (root) {
+    'use strict';
+    const MiB = 1 << 20, WORD = 8;
+    const cdiv = (a, b) => Math.ceil(a / b);
+    const ceilLog2 = x => (x > 1 ? (x - 1).toString(2).length : 0);
+    const log2Int = x => x.toString(2).length - 1;
+
+    // ── parameters (params.py) ───────────────────────────────────────
+    function mkParams(o) {
+        const p = Object.assign({ qBits: 50, logSlots: null, ctsLevels: 3, stcLevels: 3, evalmodDegree: 59, doubleAngle: 2 }, o);
+        p.N = 2 ** p.logN;
+        p.slotsLog = p.logSlots === null ? p.logN - 1 : p.logSlots;
+        p.fullSlots = p.slotsLog === p.logN - 1;
+        p.alpha = cdiv(p.L + 1, p.dnum);
+        p.k = p.alpha;
+        p.beta = lev => cdiv(lev + 1, p.alpha);
+        p.digitSizes = lev => { const l = lev + 1, out = []; for (let i = 0; i < p.beta(lev); i++) out.push(Math.min(p.alpha, l - i * p.alpha)); return out; };
+        p.ctBytes = lev => 2 * p.N * (lev + 1) * WORD;
+        p.ptBytes = lev => p.N * (lev + 1) * WORD;
+        p.evkBytes = lev => (lev === undefined || lev === null) ? 2 * p.dnum * p.N * (p.L + 1 + p.k) * WORD : 2 * p.beta(lev) * p.N * (lev + 1 + p.k) * WORD;
+        p.modupBytes = lev => p.beta(lev) * p.N * (lev + 1 + p.k) * WORD;
+        p.ksWorkingSet = () => { const lk = p.L + 1 + p.k; return (p.beta(p.L) * lk + 2 * lk) * p.N * WORD; };
+        p.logPQ = () => 60 + p.L * p.qBits + 60 * p.k;
+        let b = 1; while (b * b < p.evalmodDegree + 1) b *= 2;
+        p.evalmodBaby = b;
+        p.evalmodGiant = cdiv(p.evalmodDegree + 1, b);
+        return p;
+    }
+    const PARAMS = {
+        'ark': { name: 'ARK-like (N=2^16, L=23, dnum=4)', logN: 16, L: 23, dnum: 4 },
+        'lattigo': { name: 'Lattigo-like (N=2^16, L=24, dnum=5)', logN: 16, L: 24, dnum: 5 },
+        'gpu100x': { name: '100x GPU (N=2^16, L=34, dnum=5)', logN: 16, L: 34, dnum: 5 },
+        'openfhe-sparse': { name: 'OpenFHE sparse (N=2^16, L=18, dnum=3, 8 slots)', logN: 16, L: 18, dnum: 3, qBits: 59,
+                            logSlots: 3, ctsLevels: 1, stcLevels: 1, evalmodDegree: 119, doubleAngle: 3 },
+        'small': { name: 'small test set (N=2^12, L=11, dnum=3)', logN: 12, L: 11, dnum: 3, ctsLevels: 2, stcLevels: 2,
+                   evalmodDegree: 15, doubleAngle: 1 },
+    };
+
+    // ── workload (workload.py) ───────────────────────────────────────
+    const STAGES = ['modraise', 'cts', 'evalmod', 'stc'];
+    const K = (kind, amount, words) => ({ kind, amount, words });
+    const kNtt = (limbs, N, inv) => K(inv ? 'intt' : 'ntt', limbs, 2 * limbs * N);
+    const kMac = ops => K('mac', ops, 3 * ops);
+    function ksModup(p, lev) {
+        const N = p.N, l = lev + 1, k = p.k, ds = p.digitSizes(lev);
+        let newLimbs = 0, bconv = 0;
+        for (const a of ds) newLimbs += l + k - a;
+        for (const a of ds) bconv += N * a * (l + k - a);
+        bconv += N * l;
+        return [kNtt(l, N, true), K('bconv', bconv, N * (l + newLimbs)), kNtt(newLimbs, N)];
+    }
+    function ksTail(p, lev) {
+        const N = p.N, l = lev + 1, k = p.k, b = p.beta(lev);
+        const inner = 2 * b * (l + k) * N, moddown = 2 * (N * k * l + N * k + N * l);
+        return [K('mac', inner, 3 * b * (l + k) * N + 2 * (l + k) * N), kNtt(2 * k, N, true),
+                K('bconv', moddown, 4 * N * (k + l)), kNtt(2 * l, N)];
+    }
+    function rescaleKernels(p, lev) {
+        const N = p.N, l = lev + 1;
+        return [kNtt(2, N, true), kNtt(2 * (l - 1), N), kMac(2 * (l - 1) * N)];
+    }
+    function dftSplit(logSlots, n) {
+        const base = Math.floor(logSlots / n), rem = logSlots % n, out = [];
+        for (let j = 0; j < n; j++) out.push(j < rem ? base + 1 : base);
+        return out;
+    }
+
+    function Builder(p, o) {
+        const B = { p, o, ops: [], sizes: {}, levels: {}, external: [], stage: 'modraise', boot: 0, n: 0 };
+        B.obj = (level, nbytes) => { const name = `b${B.boot}.c${B.n}`; B.n++; B.sizes[name] = nbytes; B.levels[name] = level; return name; };
+        B.externalCt = level => { const name = B.obj(level, p.ctBytes(level)); B.external.push(name); return name; };
+        B.key = (kid, level) => { const b = p.evkBytes(level); return [kid, o.seededKeys ? Math.floor(b / 2) : b]; };
+        B.seedKernels = level => o.seededKeys ? [kMac(p.beta(level) * (level + 1 + p.k) * p.N)] : [];
+        B.emit = (op, level, inputs, outLevel, kernels, key, pts, outBytes) => {
+            const out = B.obj(outLevel, outBytes === undefined ? p.ctBytes(outLevel) : outBytes);
+            B.ops.push({ id: B.ops.length, op, stage: B.stage, level, inputs: inputs.slice(), output: out, kernels,
+                         key: key || null, pts: pts || [], boot: B.boot });
+            return out;
+        };
+        B.lvl = (...xs) => Math.min(...xs.map(x => B.levels[x]));
+        B.hmult = (a, b, extra, postAdds) => {
+            extra = extra || []; postAdds = postAdds === undefined ? 1 : postAdds;
+            const lev = B.lvl(a, b), N = p.N, l = lev + 1;
+            const ks = [kMac(4 * l * N), ...ksModup(p, lev), ...B.seedKernels(lev), ...ksTail(p, lev),
+                        kMac(2 * l * N * postAdds), ...rescaleKernels(p, lev)];
+            return B.emit('hmult', lev, [a, b, ...extra], lev - 1, ks, B.key('relin', lev));
+        };
+        B.hrot = (x, kid) => {
+            const lev = B.lvl(x), N = p.N, l = lev + 1;
+            const ks = [K('auto', 2 * l * N, 4 * l * N), ...ksModup(p, lev), ...B.seedKernels(lev), ...ksTail(p, lev)];
+            return B.emit('hrot', lev, [x], lev, ks, B.key(kid, lev));
+        };
+        B.modup = x => { const lev = B.lvl(x); return B.emit('modup', lev, [x], lev, ksModup(p, lev), null, [], p.modupBytes(lev)); };
+        B.hrotHoisted = (x, digits, kid) => {
+            const lev = B.lvl(x), N = p.N, l = lev + 1;
+            const w = (l + p.beta(lev) * (l + p.k)) * N;
+            const ks = [K('auto', w, 2 * w), ...B.seedKernels(lev), ...ksTail(p, lev)];
+            return B.emit('hrot', lev, [x, digits], lev, ks, B.key(kid, lev));
+        };
+        B.pmac = (xs, ptIds) => {
+            const lev = B.lvl(...xs), N = p.N, l = lev + 1, m = xs.length;
+            let kern = [kMac(2 * l * N * m + 2 * l * N * (m - 1))], pts;
+            if (o.otfPlaintexts) { kern = [kNtt(l * m, N), kMac(l * N * m), ...kern]; pts = ptIds.map(id => [id, N * 8]); }
+            else pts = ptIds.map(id => [id, p.ptBytes(lev)]);
+            return B.emit('pmac', lev, xs, lev, kern, null, pts);
+        };
+        B.add = (xs, rescale) => {
+            const lev = B.lvl(...xs), N = p.N, l = lev + 1;
+            let kern = [kMac(2 * l * N * Math.max(1, xs.length - 1))];
+            if (rescale) kern = kern.concat(rescaleKernels(p, lev));
+            return B.emit('add', lev, xs, rescale ? lev - 1 : lev, kern);
+        };
+        B.cmult = xs => {
+            const lev = B.lvl(...xs), N = p.N, l = lev + 1;
+            return B.emit('cmult', lev, xs, lev - 1, [kMac(2 * l * N * xs.length + 2 * l * N), ...rescaleKernels(p, lev)]);
+        };
+        B.modraise = x => {
+            let y = B.emit('modraise', 0, [x], p.L, [kNtt(2, p.N, true), kNtt(2 * (p.L + 1), p.N)]);
+            for (let i = 0; i < p.logN - 1 - p.slotsLog; i++) y = B.add([y, B.hrot(y, `sub${i}`)]);
+            return y;
+        };
+        B.dft = (x, prefix, nLevels) => {
+            const split = dftSplit(p.slotsLog, nLevels);
+            for (let j = 0; j < split.length; j++) {
+                const k = split[j], d = 2 ** (k + 1) - 1, n1 = Math.min(2 ** cdiv(k + 1, 2), d), n2 = cdiv(d, n1), tag = `${prefix}${j}`;
+                const babies = [x];
+                if (n1 > 1) {
+                    if (o.minKs) { for (let i = 1; i < n1; i++) babies.push(B.hrot(babies[babies.length - 1], `${tag}.b`)); }
+                    else if (o.hoisting) { const dig = B.modup(x); for (let i = 1; i < n1; i++) babies.push(B.hrotHoisted(x, dig, `${tag}.b${i}`)); }
+                    else { for (let i = 1; i < n1; i++) babies.push(B.hrot(x, `${tag}.b${i}`)); }
+                }
+                const inners = [];
+                for (let g = 0; g < n2; g++) {
+                    const m = Math.min(n1, d - g * n1), ids = [];
+                    for (let i = 0; i < m; i++) ids.push(`${tag}.d${g}.${i}`);
+                    inners.push(B.pmac(babies.slice(0, m), ids));
+                }
+                if (o.minKs) {
+                    let acc = inners[inners.length - 1];
+                    for (let g = n2 - 2; g >= 0; g--) acc = B.add([B.hrot(acc, `${tag}.g`), inners[g]], g === 0);
+                    x = n2 > 1 ? acc : B.add([acc], true);
+                } else {
+                    const parts = [inners[0]];
+                    for (let g = 1; g < n2; g++) parts.push(B.hrot(inners[g], `${tag}.g${g}`));
+                    x = B.add(parts, true);
+                }
+            }
+            return x;
+        };
+        B.evalmod = x => {
+            const b = p.evalmodBaby, g = p.evalmodGiant;
+            const T = { 1: B.cmult([x]) };
+            for (let i = 2; i <= b; i++) T[i] = B.hmult(T[Math.floor((i + 1) / 2)], T[Math.floor(i / 2)]);
+            const m = ceilLog2(g), G = [T[b]];
+            for (let t = 1; t < m; t++) G.push(B.hmult(G[G.length - 1], G[G.length - 1]));
+            let nodes = [];
+            for (let t = 0; t < g; t++) { const ts = []; for (let i = 1; i < b; i++) ts.push(T[i]); nodes.push(B.cmult(ts)); }
+            let t = 0;
+            while (nodes.length > 1) {
+                const nxt = [];
+                for (let s = 0; s < nodes.length - 1; s += 2) nxt.push(B.hmult(nodes[s + 1], G[t], [nodes[s]]));
+                if (nodes.length % 2) nxt.push(nodes[nodes.length - 1]);
+                nodes = nxt; t++;
+            }
+            let y = nodes[0];
+            for (let r = 0; r < p.doubleAngle; r++) y = B.hmult(y, y);
+            return y;
+        };
+        B.bootstrap = x => {
+            B.stage = 'modraise'; x = B.modraise(x);
+            B.stage = 'cts'; x = B.dft(x, 'cts', p.ctsLevels);
+            const c = B.hrot(x, 'conj');
+            let parts = p.fullSlots ? [B.add([x, c]), B.add([x, c])] : [B.add([x, c])];
+            B.stage = 'evalmod'; parts = parts.map(y => B.evalmod(y));
+            x = parts.length > 1 ? B.add(parts) : parts[0];
+            B.stage = 'stc'; x = B.dft(x, 'stc', p.stcLevels);
+            if (B.levels[x] < 0) throw new Error(`${p.name}: bootstrapping needs more than L = ${p.L} levels`);
+            return x;
+        };
+        return B;
+    }
+    function bootOptions(o) {
+        return Object.assign({ nBoot: 1, hoisting: true, minKs: false, seededKeys: false, otfPlaintexts: false }, o || {});
+    }
+    function bootstrapTrace(p, opts) {
+        const o = bootOptions(opts), B = Builder(p, o);
+        for (let i = 0; i < o.nBoot; i++) { B.boot = i; B.bootstrap(B.externalCt(0)); }
+        return { params: p, ops: B.ops, sizes: B.sizes, external: B.external, levels: B.levels, options: o };
+    }
+    function heOpTrace(p, op, level, n) {
+        const B = Builder(p, bootOptions({})), lev = level === undefined || level === null ? p.L : level;
+        B.stage = op;
+        for (let i = 0; i < (n || 1); i++) {
+            B.boot = i;
+            const x = B.externalCt(lev), y = B.externalCt(lev);
+            if (op === 'hmult') B.hmult(x, y); else B.hrot(x, 'rot1');
+        }
+        return { params: p, ops: B.ops, sizes: B.sizes, external: B.external, levels: B.levels, options: B.o };
+    }
+    function summariseTrace(trace) {
+        const out = {};
+        for (const o of trace.ops) {
+            const s = out[o.stage] || (out[o.stage] = { hmult: 0, hrot: 0, pmult: 0, ops: 0, ntt_limbs: 0, intt_limbs: 0, bconv: 0, mac: 0, auto_words: 0, keys: new Set(), key_bytes: 0, pt_bytes: 0 });
+            s.ops++;
+            if (o.op === 'hmult' || o.op === 'hrot') s[o.op]++;
+            if (o.op === 'pmac') s.pmult += o.pts.length;
+            for (const k of o.kernels) {
+                if (k.kind === 'ntt') s.ntt_limbs += k.amount; else if (k.kind === 'intt') s.intt_limbs += k.amount;
+                else if (k.kind === 'auto') s.auto_words += k.amount; else s[k.kind] += k.amount;
+            }
+            if (o.key) { s.keys.add(o.key[0]); s.key_bytes += o.key[1]; }
+            for (const t of o.pts) s.pt_bytes += t[1];
+        }
+        for (const s of Object.values(out)) { s.distinct_keys = s.keys.size; delete s.keys; }
+        return out;
+    }
+
+    // ── hardware (hardware.py) ───────────────────────────────────────
+    const UNITS = ['ntt', 'mac', 'auto', 'optical'];
+    const KIND_UNIT = { ntt: 'ntt', intt: 'ntt', bconv: 'mac', mac: 'mac', auto: 'auto' };
+    function optical(o) {
+        const e = Object.assign({ name: 'Hybrid optical NTT', block: 16, enob: 12, samplesPerS: 1e12, grouping: 'grouped',
+                                  fomDacFj: 10, fomAdcFj: 20, laserW: 10, tuningW: 10, ideal: false }, o);
+        e.digits = qBits => {
+            if (e.ideal) return [qBits, 1];
+            for (let b = qBits; b >= 1; b--) {
+                const d = cdiv(qBits, b), m = e.grouping === 'grouped' ? d : 1;
+                if (2 ** (e.enob - 1) > m * e.block * (2 ** b - 1) ** 2) return [b, d];
+            }
+            throw new Error(`ENOB ${e.enob} cannot round a ${e.block}-point transform exactly even with 1-bit digits; lower block or raise ENOB`);
+        };
+        e.planes = qBits => { const d = e.digits(qBits)[1]; if (e.ideal) return [1, 1]; return e.grouping === 'grouped' ? [d, 2 * d - 1] : [d * d, d * d]; };
+        e.pjDac = () => e.fomDacFj * 2 ** e.enob * 1e-3;
+        e.pjAdc = () => e.fomAdcFj * 2 ** e.enob * 1e-3;
+        e.staticW = e.laserW + e.tuningW;
+        return e;
+    }
+    function accelerator(o) {
+        const hw = Object.assign({ name: 'Digital FHE accelerator (ARK-class, illustrative)', freqGhz: 1.0, nttBflyPerCycle: 4096,
+            macLanes: 8192, autoWordsPerCycle: 4096, sramMib: 512, sramGbps: 20000.0, hbmGbps: 1000.0, hbmChunkMib: 4, window: 4,
+            tdpW: 250.0, staticW: 40.0, pjBfly: 10.0, pjMac: 5.0, pjAutoWord: 1.0, pjSramByte: 1.0, pjHbmByte: 30.0, sMin: 0.5,
+            enforceTdp: true, optical: null }, o);
+        hw.sramBytes = hw.sramMib * MiB;
+        hw.rate = u => ({ ntt: hw.nttBflyPerCycle, mac: hw.macLanes, auto: hw.autoWordsPerCycle })[u] * hw.freqGhz * 1e9;
+        hw.pj = u => ({ ntt: hw.pjBfly, mac: hw.pjMac, auto: hw.pjAutoWord })[u];
+        hw.peakPower = s => {
+            const sram = hw.sramGbps * 1e9 * hw.pjSramByte * 1e-12;
+            let p = hw.staticW + hw.hbmGbps * 1e9 * hw.pjHbmByte * 1e-12;
+            for (const u of ['ntt', 'mac', 'auto']) p += hw.rate(u) * s * hw.pj(u) * 1e-12 * s * s + sram * s;
+            if (hw.optical) { const op = hw.optical; p += op.staticW + op.samplesPerS * (op.pjDac() + op.pjAdc()) * 1e-12; }
+            return p;
+        };
+        hw.tdpClock = () => {
+            if (!hw.enforceTdp || hw.peakPower(1.0) <= hw.tdpW) return 1.0;
+            if (hw.peakPower(hw.sMin) > hw.tdpW) throw new Error(`TDP ${hw.tdpW} W is below the power at the lowest clock`);
+            let lo = hw.sMin, hi = 1.0;
+            for (let i = 0; i < 60; i++) { const mid = (lo + hi) / 2; if (hw.peakPower(mid) <= hw.tdpW) lo = mid; else hi = mid; }
+            return lo;
+        };
+        return hw;
+    }
+    const withHw = (hw, o) => accelerator(Object.assign({}, stripHw(hw), o));
+    const stripHw = hw => { const c = {}; for (const [k, v] of Object.entries(hw)) if (typeof v !== 'function' && k !== 'sramBytes') c[k] = v; return c; };
+    const SMALL_DIGITAL = { name: 'Small digital accelerator (NTT-bound, illustrative)', nttBflyPerCycle: 512, macLanes: 2048,
+                            autoWordsPerCycle: 1024, sramMib: 512, hbmGbps: 2000.0 };
+    const ACCELERATORS = {
+        'ark': () => accelerator({}),
+        'small': () => accelerator(SMALL_DIGITAL),
+        'cpu': () => accelerator({ name: 'CPU-like (fitted to OpenFHE on an i7-3770, 8 threads)', freqGhz: 3.4, nttBflyPerCycle: 0.18,
+            macLanes: 0.18, autoWordsPerCycle: 0.72, sramMib: 8192, sramGbps: 20.0, hbmGbps: 20.0, window: 1, tdpW: 77.0, staticW: 20.0,
+            pjBfly: 2000.0, pjMac: 1000.0, pjAutoWord: 200.0, pjSramByte: 5.0, pjHbmByte: 100.0, enforceTdp: false }),
+        'hybrid': () => accelerator(Object.assign({}, SMALL_DIGITAL, { name: 'Small digital + hybrid optical NTT (illustrative)',
+            tdpW: 300.0, optical: optical({ samplesPerS: 5e11 }) })),
+        'ideal-optical': () => accelerator(Object.assign({}, SMALL_DIGITAL, { name: 'Small digital + ideal optical NTT (hypothetical bound)',
+            tdpW: 300.0, optical: optical({ block: 4096, enob: 8, samplesPerS: 5e11, ideal: true }) })),
+        'hot': () => accelerator({ nttBflyPerCycle: 16384, macLanes: 32768 }),
+    };
+    function costModel(hw, logN, qBits, s) {
+        let opt = null;
+        if (hw.optical) {
+            const o = hw.optical;
+            if (o.block > 2 ** logN) throw new Error('optical block larger than the ring degree');
+            const [b, d] = o.digits(qBits), [dac, adc] = o.planes(qBits);
+            opt = [b, d, dac, adc, log2Int(o.block)];
+        }
+        const N = 2 ** logN;
+        const seg = (unit, work, words) => {
+            const tLogic = work / (hw.rate(unit) * s), tSram = words * 8 / (hw.sramGbps * 1e9 * s);
+            const t = tLogic >= tSram ? tLogic : tSram;
+            const e = work * hw.pj(unit) * 1e-12 * s * s + words * 8 * hw.pjSramByte * 1e-12;
+            return { unit, time: t, energy: e, work, dac: 0, adc: 0 };
+        };
+        return {
+            s, staticW: hw.staticW + (hw.optical ? hw.optical.staticW : 0.0),
+            segments(k) {
+                const unit = KIND_UNIT[k.kind];
+                if (unit !== 'ntt') return [seg(unit, k.amount, k.words)];
+                if (opt === null) return [seg('ntt', k.amount * (N / 2) * logN, k.words)];
+                const [, d, dacPlanes, adcPlanes, optStages] = opt, o = hw.optical, digStages = logN - optStages, segs = [];
+                if (digStages) segs.push(seg('ntt', k.amount * (N / 2) * digStages, k.words));
+                const blocks = k.amount * (N / o.block);
+                const dac = blocks * dacPlanes * 2 * o.block, adc = blocks * adcPlanes * 2 * o.block;
+                const t = (dac >= adc ? dac : adc) / o.samplesPerS;
+                segs.push({ unit: 'optical', time: t, energy: dac * o.pjDac() * 1e-12 + adc * o.pjAdc() * 1e-12, work: dac + adc, dac, adc });
+                const corr = k.amount * N * (o.ideal ? 3 : d + adcPlanes + 3);
+                segs.push(seg('mac', corr, 3 * corr));
+                return segs;
+            },
+        };
+    }
+
+    // ── a minimal SimPy core ─────────────────────────────────────────
+    const PENDING = Symbol('pending'), URGENT = 0, NORMAL = 1;
+    class Env {
+        constructor() { this.now = 0; this.q = []; this.eid = 0; }
+        schedule(ev, prio, delay) {
+            const e = [this.now + (delay || 0), prio === undefined ? NORMAL : prio, this.eid++, ev], q = this.q;
+            q.push(e);
+            let i = q.length - 1;
+            while (i > 0) { const pi = (i - 1) >> 1; if (less(q[pi], e)) break; q[i] = q[pi]; i = pi; }
+            q[i] = e;
+        }
+        pop() {
+            const q = this.q, top = q[0], last = q.pop();
+            if (q.length) {
+                let i = 0; const n = q.length;
+                for (;;) {
+                    const l = 2 * i + 1, r = l + 1; let m = i;
+                    if (l < n && less(q[l], m === i ? last : q[m])) m = l;
+                    if (r < n && less(q[r], m === i ? last : q[m])) m = r;
+                    if (m === i) break;
+                    q[i] = q[m]; i = m;
+                }
+                q[i] = last;
+            }
+            return top;
+        }
+        run() {
+            while (this.q.length) {
+                const [t, , , ev] = this.pop();
+                this.now = t;
+                const cbs = ev.callbacks; ev.callbacks = null;
+                for (const cb of cbs) cb(ev);
+            }
+        }
+        event() { return new Ev(this); }
+        timeout(d) { const ev = new Ev(this); ev._ok = true; ev._value = null; this.schedule(ev, NORMAL, d); return ev; }
+        process(gen) { return new Proc(this, gen); }
+    }
+    const less = (a, b) => a[0] < b[0] || (a[0] === b[0] && (a[1] < b[1] || (a[1] === b[1] && a[2] < b[2])));
+    class Ev {
+        constructor(env) { this.env = env; this.callbacks = []; this._value = PENDING; this._ok = true; }
+        get triggered() { return this._value !== PENDING; }
+        get processed() { return this.callbacks === null; }
+        succeed(v) {
+            if (this._value !== PENDING) throw new Error('already triggered');
+            this._ok = true; this._value = v === undefined ? null : v; this.env.schedule(this, NORMAL, 0); return this;
+        }
+    }
+    class Proc extends Ev {
+        constructor(env, gen) {
+            super(env);
+            this.gen = gen;
+            this.resume = this._resume.bind(this);
+            const init = new Ev(env); init.callbacks = [this.resume]; init._ok = true; init._value = null;
+            env.schedule(init, URGENT, 0);
+        }
+        _resume(event) {
+            for (;;) {
+                const r = this.gen.next(event._value);
+                if (r.done) { this._ok = true; this._value = r.value === undefined ? null : r.value; this.env.schedule(this, NORMAL, 0); break; }
+                event = r.value;
+                if (event.callbacks !== null) { event.callbacks.push(this.resume); break; }
+            }
+        }
+    }
+    class Resource {
+        constructor(env, capacity) { this.env = env; this.capacity = capacity; this.users = []; this.putQ = []; this.getQ = []; }
+        request() {
+            const ev = new Ev(this.env); ev.resource = this;
+            this.putQ.push(ev); ev.callbacks.push(() => this._triggerGet()); this._triggerPut();
+            return ev;
+        }
+        release(req) {
+            const ev = new Ev(this.env); ev.request = req;
+            this.getQ.push(ev); ev.callbacks.push(() => this._triggerPut()); this._triggerGet();
+            return ev;
+        }
+        _triggerPut() {
+            let idx = 0;
+            while (idx < this.putQ.length) {
+                const e = this.putQ[idx];
+                if (this.users.length < this.capacity) { this.users.push(e); e.succeed(); }
+                if (!e.triggered) idx++; else this.putQ.splice(idx, 1);
+                break;                                  // Resource._do_put returns None: stop after one
+            }
+        }
+        _triggerGet() {
+            let idx = 0;
+            while (idx < this.getQ.length) {
+                const e = this.getQ[idx], u = this.users.indexOf(e.request);
+                if (u >= 0) this.users.splice(u, 1);
+                e.succeed();
+                if (!e.triggered) idx++; else this.getQ.splice(idx, 1);
+                break;
+            }
+        }
+    }
+
+    // ── scratchpad and engine (sim.py) ───────────────────────────────
+    class Scratchpad {
+        constructor(cap) { this.cap = cap; this.used = 0; this.items = new Map(); }
+        hit(name, size) {
+            const it = this.items.get(name);
+            if (it === undefined || it[0] < size) return false;
+            this.items.delete(name); this.items.set(name, it); return true;
+        }
+        free(name) { const it = this.items.get(name); if (it !== undefined) { this.items.delete(name); this.used -= it[0]; } }
+        alloc(name, size, cls, dirty, pinned, evicted) {
+            this.free(name);
+            if (size > this.cap) return false;
+            while (this.used + size > this.cap) {
+                let victim = null;
+                for (const n of this.items.keys()) if (!pinned.has(n)) { victim = n; break; }
+                if (victim === null) return false;
+                const [vs, vc, vd] = this.items.get(victim);
+                this.free(victim); evicted.push([victim, vs, vc, vd]);
+            }
+            this.items.set(name, [size, cls, dirty]); this.used += size; return true;
+        }
+    }
+
+    function runSim(trace, hw, clock, traceOn) {
+        const p = trace.params, env = new Env(), cost = costModel(hw, p.logN, p.qBits, clock);
+        const units = {}; for (const u of UNITS) units[u] = new Resource(env, 1);
+        const hbm = new Resource(env, 1);
+        const st = { busy: { ntt: 0, mac: 0, auto: 0, optical: 0, hbm: 0 }, work: { ntt: 0, mac: 0, auto: 0, optical: 0 },
+                     energy: { ntt: 0, mac: 0, auto: 0, optical: 0, hbm: 0 }, bytes: { key: 0, pt: 0, ct_read: 0, ct_write: 0 },
+                     dac: 0, adc: 0, stageBusy: {}, stageFirst: {}, stageLast: {}, peakW: 0 };
+        const spans = [];
+        const n = trace.ops.length, producer = {}, lastUse = {};
+        for (const o of trace.ops) producer[o.output] = o.id;
+        for (const o of trace.ops) for (const x of o.inputs) lastUse[x] = o.id;
+        const reserve = p.ksWorkingSet();
+        if (hw.sramBytes < reserve) throw new Error(`scratchpad ${hw.sramMib} MiB is smaller than one key switch's working set (${(reserve / MiB).toFixed(0)} MiB)`);
+        const spad = new Scratchpad(hw.sramBytes - reserve);
+        const done = new Array(n).fill(false), doneEv = new Array(n).fill(null), wbEv = {};
+        const opStart = new Array(n).fill(0.0), opEnd = new Array(n).fill(0.0);
+        let inflight = 0, slotEv = null, pNow = 0.0;
+        const chunk = hw.hbmChunkMib * MiB, hbmW = hw.hbmGbps * 1e9 * hw.pjHbmByte * 1e-12;
+        const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+        function plan(o) {
+            const pl = { keyLoad: 0, ptLoad: 0, ctLoad: [], writebacks: [], outWrite: 0 }, sizes = trace.sizes;
+            const pinned = new Set(o.inputs); pinned.add(o.output);
+            if (o.key) pinned.add(o.key[0]);
+            for (const [pid] of o.pts) pinned.add(pid);
+            const ev = [];
+            for (const x of o.inputs) if (!spad.hit(x, sizes[x])) { pl.ctLoad.push([x, sizes[x]]); spad.alloc(x, sizes[x], 'ct', false, pinned, ev); }
+            if (o.key) { const [kid, kb] = o.key; if (!spad.hit(kid, kb)) { pl.keyLoad += kb; spad.alloc(kid, kb, 'key', false, pinned, ev); } }
+            for (const [pid, pb] of o.pts) if (!spad.hit(pid, pb)) { pl.ptLoad += pb; spad.alloc(pid, pb, 'pt', false, pinned, ev); }
+            const outSize = sizes[o.output];
+            if (!has(lastUse, o.output)) pl.outWrite = outSize;
+            else if (!spad.alloc(o.output, outSize, 'ct', true, pinned, ev)) pl.outWrite = outSize;
+            for (const [name, size, , dirty] of ev) if (dirty && (has(lastUse, name) ? lastUse[name] : -1) > o.id) pl.writebacks.push([name, size]);
+            for (const x of o.inputs) if (lastUse[x] === o.id) spad.free(x);
+            return pl;
+        }
+        const power = dp => { pNow += dp; if (pNow > st.peakW) st.peakW = pNow; };
+        const stageBusy = (stage, unit, dt) => { const d = st.stageBusy[stage] || (st.stageBusy[stage] = {}); d[unit] = (d[unit] || 0.0) + dt; };
+        function* waitDone(i) { if (!done[i]) yield doneEv[i]; }
+        function* xfer(nbytes, cls, stage) {
+            const bw = hw.hbmGbps * 1e9; let left = nbytes;
+            while (left > 0) {
+                const sz = left < chunk ? left : chunk;
+                const req = hbm.request(); yield req;
+                const start = env.now; power(hbmW);
+                const dt = sz / bw;
+                yield env.timeout(dt);
+                power(-hbmW); hbm.release(req);
+                st.busy.hbm += dt; st.energy.hbm += sz * hw.pjHbmByte * 1e-12; stageBusy(stage, 'hbm', dt);
+                if (traceOn) spans.push(['hbm', stage, start, dt, cls]);
+                left -= sz;
+            }
+            st.bytes[cls] += nbytes;
+        }
+        function* writeback(name, size) { const pr = producer[name]; if (pr !== undefined) yield* waitDone(pr); yield* xfer(size, 'ct_write', 'spill'); }
+        function* prefetch(o, pl) { if (pl.keyLoad) yield* xfer(pl.keyLoad, 'key', o.stage); if (pl.ptLoad) yield* xfer(pl.ptLoad, 'pt', o.stage); }
+        function* runOp(o, pl) {
+            const pf = (pl.keyLoad || pl.ptLoad) ? env.process(prefetch(o, pl)) : null;
+            for (const [name, size] of pl.writebacks) wbEv[name] = env.process(writeback(name, size));
+            for (const x of o.inputs) { const pr = producer[x]; if (pr !== undefined) yield* waitDone(pr); }
+            for (const [x, size] of pl.ctLoad) { const w = wbEv[x]; if (w !== undefined && !w.processed) yield w; yield* xfer(size, 'ct_read', o.stage); }
+            if (pf !== null && !pf.processed) yield pf;
+            opStart[o.id] = env.now;
+            if (!has(st.stageFirst, o.stage)) st.stageFirst[o.stage] = env.now;
+            for (const k of o.kernels) {
+                for (const seg of cost.segments(k)) {
+                    const req = units[seg.unit].request(); yield req;
+                    const start = env.now, pw = seg.time > 0 ? seg.energy / seg.time : 0.0;
+                    power(pw);
+                    yield env.timeout(seg.time);
+                    power(-pw); units[seg.unit].release(req);
+                    st.busy[seg.unit] += seg.time; st.work[seg.unit] += seg.work; st.energy[seg.unit] += seg.energy;
+                    st.dac += seg.dac; st.adc += seg.adc; stageBusy(o.stage, seg.unit, seg.time);
+                    if (traceOn) spans.push([seg.unit, o.stage, start, seg.time, `${o.op}.${k.kind} L${o.level}`]);
+                }
+            }
+            if (pl.outWrite) yield* xfer(pl.outWrite, 'ct_write', o.stage);
+            opEnd[o.id] = env.now; st.stageLast[o.stage] = env.now;
+            done[o.id] = true; doneEv[o.id].succeed(); inflight--;
+            if (slotEv !== null && !slotEv.triggered) slotEv.succeed();
+        }
+        function* issuer() {
+            for (const o of trace.ops) {
+                while (inflight >= hw.window) { slotEv = env.event(); yield slotEv; }
+                const pl = plan(o);
+                inflight++; doneEv[o.id] = env.event(); env.process(runOp(o, pl));
+            }
+        }
+        env.process(issuer());
+        env.run();
+        return { trace, hw, clock: cost.s, horizon: env.now, stats: st, opStart, opEnd, staticW: cost.staticW, spans };
+    }
+
+    function simulate(trace, hw, opt) {
+        opt = opt || {};
+        const s = opt.clock !== undefined && opt.clock !== null ? opt.clock : hw.tdpClock();
+        let res = runSim(trace, hw, s, !!opt.trace);
+        if (opt.dvfs && (opt.clock === undefined || opt.clock === null)) {
+            const b = res.stats.busy;
+            const top = Math.max(b.ntt, b.mac, b.auto);
+            if (b.hbm > top) {
+                let s2 = s * top / b.hbm;
+                if (s2 < hw.sMin) s2 = hw.sMin;
+                if (s2 < s) res = runSim(trace, hw, s2, !!opt.trace);
+            }
+        }
+        return res;
+    }
+
+    // ── metrics (metrics.py) ─────────────────────────────────────────
+    const BOUND_NAME = { hbm: 'memory-bound', ntt: 'NTT-bound', optical: 'NTT-bound (optical engine)', mac: 'MAC-bound', auto: 'permutation-bound' };
+    function summarise(res) {
+        const st = res.stats, H = res.horizon, hw = res.hw;
+        let nBoot = 0; for (const o of res.trace.ops) if (o.boot + 1 > nBoot) nBoot = o.boot + 1;
+        const resources = [...UNITS, 'hbm'], util = {};
+        for (const u of resources) util[u] = st.busy[u] / H;
+        let top = 'hbm';
+        for (const u of resources) if (util[u] > util[top]) top = u;
+        let bound = BOUND_NAME[top];
+        if (res.clock < 1.0 && top !== 'hbm' && hw.enforceTdp) bound = 'power-bound (' + BOUND_NAME[top] + ' at a TDP-limited clock)';
+        const stages = {}, hot = {};
+        for (const s of STAGES) {
+            if (!(s in st.stageFirst)) continue;
+            const span = st.stageLast[s] - st.stageFirst[s], busy = st.stageBusy[s] || {};
+            let r = null;
+            for (const u of resources) if ((busy[u] || 0.0) > 0 && (r === null || busy[u] > busy[r])) r = u;
+            const bs = {}; for (const u of resources) bs[u] = busy[u] || 0.0;
+            stages[s] = { span_s: span, busy_s: bs }; hot[s] = r;
+        }
+        let totalSpan = 0; for (const v of Object.values(stages)) totalSpan += v.span_s;
+        for (const v of Object.values(stages)) v.share = totalSpan > 0 ? v.span_s / totalSpan : 0.0;
+        let hottest = null;
+        for (const s of Object.keys(stages)) if (hottest === null || stages[s].span_s > stages[hottest].span_s) hottest = s;
+        const b = st.bytes, hbmTotal = b.key + b.pt + b.ct_read + b.ct_write;
+        const stat = res.staticW * H;
+        let dyn = 0; for (const u of resources) dyn += st.energy[u];
+        const total = stat + dyn, br = { static: stat / total };
+        for (const u of resources) br[u] = st.energy[u] / total;
+        let lower = 0; for (const u of resources) if (st.busy[u] > lower) lower = st.busy[u];
+        return {
+            params: res.trace.params.name, hardware: hw.name, nBoot, clock: res.clock, latencyS: H, perBootstrapS: H / nBoot,
+            utilisation: util, bound, boundResource: top, stages,
+            hotspots: { stage: hottest, resource: hot[hottest] === undefined ? null : hot[hottest], perStage: hot },
+            hbmBytes: Object.assign({}, b, { total: hbmTotal, keyShare: hbmTotal ? b.key / hbmTotal : 0.0 }),
+            energy: { totalJ: total, perBootstrapJ: total / nBoot, avgPowerW: total / H, peakW: res.staticW + st.peakW, tdpW: hw.tdpW,
+                      breakdown: br, dacSamples: st.dac, adcSamples: st.adc },
+            lowerBoundS: lower,
+        };
+    }
+
+    // ── convenience for the parity test and the deck ─────────────────
+    const camel = o => { const m = { n_boot: 'nBoot', min_ks: 'minKs', seeded_keys: 'seededKeys', otf_plaintexts: 'otfPlaintexts' }, out = {};
+        for (const [k, v] of Object.entries(o || {})) out[m[k] || k] = v; return out; };
+    function simulateNamed(paramsName, hwName, opts, dvfs) {
+        const p = mkParams(PARAMS[paramsName]), hw = ACCELERATORS[hwName]();
+        return simulate(bootstrapTrace(p, camel(opts)), hw, { dvfs: !!dvfs });
+    }
+    root.FheSim = { PARAMS, ACCELERATORS, STAGES, UNITS, mkParams, bootstrapTrace, heOpTrace, summariseTrace, accelerator, optical, withHw,
+                    costModel, simulate, summarise, simulateNamed, dftSplit };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+    </script>
+    <script>
+    (function(){
+        const F = window.FheSim, $ = id => document.getElementById(id);
+        const ids = ['sb-n','sb-l','sb-d','sb-c','sb-s','sb-r'];
+        const NAMES = { modraise: 'ModRaise', cts: 'CoeffToSlot', evalmod: 'EvalMod', stc: 'SlotToCoeff' };
+        function opts(){ const a = $('sb-alg').value;
+            return a === 'nohoist' ? { hoisting: false } : a === 'minks' ? { minKs: true } : a === 'all' ? { minKs: true, seededKeys: true, otfPlaintexts: true } : {}; }
+        function rec(){
+            ids.forEach(id => $(id + '-val').textContent = $(id).value);
+            const logN = +$('sb-n').value, L = +$('sb-l').value, dn = Math.min(+$('sb-d').value, L + 1);
+            const sl = $('sb-slots').value;
+            const p = F.mkParams({ name: 'custom', logN, L, dnum: dn, ctsLevels: +$('sb-c').value, stcLevels: +$('sb-s').value,
+                                   evalmodDegree: +$('sb-deg').value, doubleAngle: +$('sb-r').value, logSlots: sl === 'full' ? null : Math.min(+sl, logN - 2) });
+            let t;
+            try { t = F.bootstrapTrace(p, opts()); }
+            catch (e) { $('sb-m').innerHTML = ''; $('sb-r1').innerHTML = `<span class="line-label">not enough levels:</span> ${e.message}. Raise L or use fewer DFT levels / a lower EvalMod degree.`; $('sb-c1').getContext('2d').clearRect(0, 0, 900, 300); return; }
+            const s = F.summariseTrace(t), st = F.STAGES.filter(k => s[k]);
+            let rot = 0, hm = 0, pm = 0, ntt = 0, kb = 0, pb = 0, keys = new Set();
+            for (const o of t.ops) { if (o.key) keys.add(o.key[0]); }
+            st.forEach(k => { rot += s[k].hrot; hm += s[k].hmult; pm += s[k].pmult; ntt += s[k].ntt_limbs + s[k].intt_limbs; kb += s[k].key_bytes; pb += s[k].pt_bytes; });
+            const last = t.ops[t.ops.length - 1].output, left = t.levels[last];
+            const cell = (l, v) => `<div class="metric"><div class="metric-label">${l}</div><div class="metric-value">${v}</div></div>`;
+            $('sb-m').innerHTML = [cell('HE ops', t.ops.length), cell('Rotations', rot), cell('HMults', hm), cell('PMults', pm),
+                cell('Distinct keys', keys.size), cell('Limb transforms', ntt.toLocaleString()), cell('Key GB requested', (kb / 1e9).toFixed(2)),
+                cell('Levels used / left', `${L - left} / ${left}`)].join('');
+            const c = $('sb-c1'), g = c.getContext('2d'), W = c.width, H = c.height;
+            g.clearRect(0, 0, W, H); g.font = '12px "Geist Mono", monospace';
+            const series = [['ntt', '#aabd59', k => s[k].ntt_limbs + s[k].intt_limbs], ['key', '#e3b174', k => s[k].key_bytes], ['pt', '#97cdc6', k => s[k].pt_bytes]];
+            const max = series.map(([, , f]) => Math.max(1, ...st.map(f)));
+            const bw = (W - 120) / st.length;
+            st.forEach((k, i) => {
+                const x0 = 100 + i * bw;
+                g.fillStyle = '#a2978b'; g.fillText(NAMES[k], x0 + 10, H - 10);
+                series.forEach(([, col, f], j) => {
+                    const v = f(k), h = (H - 60) * v / max[j];
+                    g.fillStyle = col; g.fillRect(x0 + 10 + j * (bw - 30) / 3, H - 30 - h, (bw - 40) / 3, h);
+                });
+            });
+            g.strokeStyle = '#3a322b'; g.beginPath(); g.moveTo(90, H - 30); g.lineTo(W - 10, H - 30); g.stroke();
+            $('sb-r1').innerHTML = `<span class="line-label">ciphertext</span> ${(p.ctBytes(L) / 2 ** 20).toFixed(1)} MiB &middot; <span class="line-label">key</span> ${(p.evkBytes() / 2 ** 20).toFixed(0)} MiB stored`
+                + ` &middot; <span class="line-label">plaintext GB requested</span> ${(pb / 1e9).toFixed(2)} &middot; <span class="line-label">log PQ &asymp;</span> ${p.logPQ()}`
+                + `<br>` + st.map(k => `${NAMES[k]}: ${s[k].hrot} rot, ${s[k].hmult} mult, ${(s[k].key_bytes / 1e9).toFixed(2)} GB keys`).join(' &middot; ');
+        }
+        ids.forEach(id => $(id).addEventListener('input', rec));
+        ['sb-deg','sb-slots','sb-alg'].forEach(id => $(id).addEventListener('change', rec));
+        rec();
+    })();
+    </script>
+</section>
+
+<section class="slide" id="slide-11">
+    <div class="slide-number">11</div>
+    <h2>Algorithmic Levers</h2>
+    <p>Each technique changes the workload, not the hardware. Effects on one ark-set bootstrap, from the companion trace generator:</p>
+    <div class="table-wrap">
+    <table>
+        <tr><th>Technique</th><th>What it does</th><th>Effect on the workload</th></tr>
+        <tr><td><strong>Hoisting</strong> (default)</td><td>Baby-step rotations share one ModUp</td><td>Fewer NTTs; same keys. Turning it off costs 15% more time on an NTT-starved design (deck 05)</td></tr>
+        <tr><td><strong>Min-KS</strong> (ARK)</td><td>Apply baby and giant rotations iteratively by one fixed step, so a whole BSGS loop needs only 2 keys</td><td>CoeffToSlot keys: 43 &rarr; 7. Same rotation count, but hoisting is lost (more NTTs) and the rotations are serial</td></tr>
+        <tr><td><strong>Seeded keys</strong></td><td>The uniform half of each evaluation key is regenerated on chip from a seed</td><td>Key bytes halved; some PRNG work on the multiply-add lanes</td></tr>
+        <tr><td><strong>On-the-fly plaintexts</strong> (in the spirit of ARK's OF-Limb)</td><td>Generate DFT diagonals on chip from a compact form instead of loading them</td><td>Plaintext bytes drop to one limb each; adds NTTs</td></tr>
+        <tr><td><strong>Level ordering</strong></td><td>SlotToCoeff first, at low levels</td><td>Cheaper DFT. Not modelled in the companion code; an exercise</td></tr>
+        <tr><td><strong>Radix / level budget</strong></td><td>More DFT levels &rarr; fewer rotations</td><td>Fewer keys and bytes, fewer useful levels; use the interactive slide</td></tr>
+    </table>
+    </div>
+    <p>All four modelled techniques trade arithmetic for bytes. Whether that wins depends on whether the design is memory-bound or compute-bound, which is exactly what the simulator in deck 03 decides.</p>
+</section>
+
+<section class="slide" id="slide-12">
+    <div class="slide-number">12</div>
+    <h2>What to Take Away</h2>
+    <ul>
+        <li><strong>Four stages:</strong> ModRaise (cheap), CoeffToSlot and SlotToCoeff (homomorphic DFTs: rotations, distinct keys, plaintexts) and EvalMod (a polynomial: multiplications, one key).</li>
+        <li><strong>BSGS</strong> turns a 63-diagonal level into 14 rotations; <strong>hoisting</strong> shares the ModUp; the keys stay distinct.</li>
+        <li><strong>Levels:</strong> the ark set spends 16 of 23 levels bootstrapping, leaving 7.</li>
+        <li><strong>Per bootstrap:</strong> 203 HE ops, 85 rotations, 36 HMults, 13,710 limb transforms, and about 9.3 GB of keys and 3.3 GB of plaintexts requested.</li>
+        <li><strong>Two personalities:</strong> the DFT stages stream data, EvalMod computes. Simulate the sequence, not the totals.</li>
+    </ul>
+    <div class="callout">
+        <div class="callout-label">Next</div>
+        <p>Deck 03 builds the accelerator model and runs this workload on it, live.</p>
+    </div>
+</section>
+
+<!-- ════════════════════════════════════ Footer ════════════════════════════════════ -->
+<footer class="footer">
+    <p>Part of the <a href="https://github.com/BrendanJamesLynskey/FHE_Hub_Accelerator_Simulators">FHE Accelerator Simulators series</a> &middot; code: <a href="https://github.com/BrendanJamesLynskey/FHE_Accelerator_Sim">FHE_Accelerator_Sim</a></p>
+    <p style="margin-top: 0.5rem; font-size: 0.8rem;"><a href="https://brendanjameslynskey.github.io/FHESim_01_FHE_for_Hardware_Engineers/">&larr; 01 FHE for Hardware Engineers: CKKS as a Workload</a> &nbsp;&middot;&nbsp; <a href="https://brendanjameslynskey.github.io/FHESim_03_Simulating_an_FHE_Accelerator/">03 Simulating an FHE Accelerator &rarr;</a></p>
+    <p style="margin-top: 0.5rem; font-size: 0.8rem;">FHE fundamentals: <a href="https://github.com/BrendanJamesLynskey/Mathematics#cryptography">the Cryptography section of the Mathematics hub</a> &middot; <a href="https://brendanjameslynskey.github.io/Cryptography/08-fully-homomorphic-encryption/">Cryptography 08: Fully Homomorphic Encryption</a> &middot; sister series: <a href="https://github.com/BrendanJamesLynskey/LLM_Hub_Inference_Simulators">LLM Inference Simulators</a></p>
+</footer>
+
+<script>
+    // Smooth scroll for TOC links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+
+    // Subtle fade-in on scroll
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.slide').forEach(slide => {
+        slide.style.opacity = '0';
+        slide.style.transform = 'translateY(30px)';
+        slide.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(slide);
+    });
+</script>
+
+</body>
+</html>
