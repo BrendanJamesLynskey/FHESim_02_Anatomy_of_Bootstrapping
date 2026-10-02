@@ -826,7 +826,8 @@
         <li><a href="#slide-09">The Data-Movement Profile</a></li>
         <li><a href="#slide-10">Interactive: Stage Breakdown</a></li>
         <li><a href="#slide-11">Algorithmic Levers</a></li>
-        <li><a href="#slide-12">What to Take Away</a></li>
+        <li><a href="#slide-12">Checked Against a Real OpenFHE Bootstrap</a></li>
+        <li><a href="#slide-13">What to Take Away</a></li>
     </ul>
 </section>
 
@@ -948,7 +949,7 @@
     <ul>
         <li><strong>Two copies for full slots.</strong> After CoeffToSlot a conjugation (one more rotation) splits the real and imaginary parts, and EvalMod runs on each: 36 HMults in total.</li>
         <li><strong>One key, reused 36 times:</strong> the relinearisation key. EvalMod is NTT-heavy and cache-friendly, the opposite of the DFT stages.</li>
-        <li>The degree, the double-angle count and the use of a sine or cosine are accuracy choices; libraries differ (OpenFHE's sparse configuration in our calibration uses degree 119 and three double-angle steps).</li>
+        <li>The degree, the double-angle count and the use of a sine or cosine are accuracy choices; libraries differ. OpenFHE v1.5.1 with uniform ternary keys uses an 89-coefficient (degree-88) Chebyshev series and six double-angle steps, read from its source and confirmed by its recorded trace (slide 12).</li>
     </ul>
 </section>
 
@@ -971,13 +972,14 @@
         <tr><td>ark</td><td>23</td><td>3</td><td>10</td><td>3</td><td>16</td><td>7</td></tr>
         <tr><td>lattigo</td><td>24</td><td>3</td><td>10</td><td>3</td><td>16</td><td>8</td></tr>
         <tr><td>gpu100x</td><td>34</td><td>3</td><td>10</td><td>3</td><td>16</td><td>18</td></tr>
-        <tr><td>openfhe-sparse (8 slots)</td><td>18</td><td>1</td><td>12</td><td>1</td><td>14</td><td>4</td></tr>
+        <tr><td>openfhe-sparse (8 slots)</td><td>18</td><td>1</td><td>14</td><td>1</td><td>16</td><td>2</td></tr>
+        <tr><td>openfhe-full14 (N = 2<sup>14</sup>)</td><td>30</td><td>3</td><td>14</td><td>3</td><td>20</td><td>10</td></tr>
     </table>
     </div>
     <ul>
         <li><strong>Bootstrapping is expensive per useful level.</strong> With 7 levels left, a deep computation bootstraps every 7 multiplications. The cost per useful level is the number that matters to applications (ARK and 100x use an amortised metric, T<sub>A.S.</sub>, for this reason).</li>
         <li><strong>Bigger L buys more useful levels</strong> but makes every ciphertext, key and transform bigger, and pushes up PQ against the security bound.</li>
-        <li>These level counts come from the companion trace generator, and a test checks them against the closed form CtS + (2 + &lceil;log<sub>2</sub>(b&minus;1)&rceil; + &lceil;log<sub>2</sub>g&rceil; + r) + StC.</li>
+        <li>These level counts come from the companion trace generator. A test checks them against the closed form CtS + (2 + &lceil;log<sub>2</sub>(b&minus;1)&rceil; + &lceil;log<sub>2</sub>g&rceil; + r) + StC where g is a power of two; for the two OpenFHE rows they equal the bootstrap depth OpenFHE itself reports (16 and 20).</li>
     </ul>
 </section>
 
@@ -1038,10 +1040,10 @@
             <div class="control-row"><label for="sb-d">dnum</label><input type="range" id="sb-d" min="1" max="12" value="4"><span class="val" id="sb-d-val">4</span></div>
             <div class="control-row"><label for="sb-c">CoeffToSlot levels</label><input type="range" id="sb-c" min="1" max="5" value="3"><span class="val" id="sb-c-val">3</span></div>
             <div class="control-row"><label for="sb-s">SlotToCoeff levels</label><input type="range" id="sb-s" min="1" max="5" value="3"><span class="val" id="sb-s-val">3</span></div>
-            <div class="control-row"><label for="sb-deg">EvalMod degree</label><select id="sb-deg"><option>15</option><option>31</option><option selected>59</option><option>119</option></select></div>
-            <div class="control-row"><label for="sb-r">Double-angle steps</label><input type="range" id="sb-r" min="0" max="3" value="2"><span class="val" id="sb-r-val">2</span></div>
+            <div class="control-row"><label for="sb-deg">EvalMod degree</label><select id="sb-deg"><option>15</option><option>31</option><option selected>59</option><option>88</option><option>119</option></select></div>
+            <div class="control-row"><label for="sb-r">Double-angle steps</label><input type="range" id="sb-r" min="0" max="6" value="2"><span class="val" id="sb-r-val">2</span></div>
             <div class="control-row"><label for="sb-slots">Slots</label><select id="sb-slots"><option value="full" selected>full (N/2)</option><option value="3">8 (sparse)</option><option value="10">1,024</option></select></div>
-            <div class="control-row"><label for="sb-alg">Algorithm</label><select id="sb-alg" style="max-width:100%"><option value="base" selected>baseline</option><option value="nohoist">no hoisting</option><option value="minks">Min-KS</option><option value="all">all three</option></select></div>
+            <div class="control-row"><label for="sb-alg">Algorithm</label><select id="sb-alg" style="max-width:100%"><option value="base" selected>baseline</option><option value="nohoist">no hoisting</option><option value="minks">Min-KS</option><option value="lazy">OpenFHE's BSGS</option><option value="all">all three</option></select></div>
         </div>
         <div class="metric-grid" id="sb-m"></div>
         <div class="chart-title" style="margin-top:0.75rem;">per stage: limb transforms (green), key GB requested (orange), plaintext GB requested (teal); bars scaled to the largest value in each colour</div>
@@ -1087,7 +1089,9 @@
         'lattigo': { name: 'Lattigo-like (N=2^16, L=24, dnum=5)', logN: 16, L: 24, dnum: 5 },
         'gpu100x': { name: '100x GPU (N=2^16, L=34, dnum=5)', logN: 16, L: 34, dnum: 5 },
         'openfhe-sparse': { name: 'OpenFHE sparse (N=2^16, L=18, dnum=3, 8 slots)', logN: 16, L: 18, dnum: 3, qBits: 59,
-                            logSlots: 3, ctsLevels: 1, stcLevels: 1, evalmodDegree: 119, doubleAngle: 3 },
+                            logSlots: 3, ctsLevels: 1, stcLevels: 1, evalmodDegree: 88, doubleAngle: 6 },
+        'openfhe-full14': { name: 'OpenFHE full slots (N=2^14, L=30, dnum=3)', logN: 14, L: 30, dnum: 3, qBits: 59,
+                            ctsLevels: 3, stcLevels: 3, evalmodDegree: 88, doubleAngle: 6 },
         'small': { name: 'small test set (N=2^12, L=11, dnum=3)', logN: 12, L: 11, dnum: 3, ctsLevels: 2, stcLevels: 2,
                    evalmodDegree: 15, doubleAngle: 1 },
     };
@@ -1153,6 +1157,34 @@
             const ks = [K('auto', w, 2 * w), ...B.seedKernels(lev), ...ksTail(p, lev)];
             return B.emit('hrot', lev, [x, digits], lev, ks, B.key(kid, lev));
         };
+        B.extend = x => {
+            const lev = B.lvl(x), N = p.N, l = lev + 1;
+            return B.emit('extend', lev, [x], lev, [kMac(2 * l * N)], null, [], 2 * (l + p.k) * N * 8);
+        };
+        B.hrotHoistedExt = (x, digits, kid) => {
+            const lev = B.lvl(x), N = p.N, l = lev + 1, k = p.k, b = p.beta(lev);
+            const w = (l + b * (l + k)) * N;
+            const ks = [K('auto', w, 2 * w), ...B.seedKernels(lev), ...ksTail(p, lev).slice(0, 1)];
+            return B.emit('hrot', lev, [x, digits], lev, ks, B.key(kid, lev), [], 2 * (l + k) * N * 8);
+        };
+        B.pmacExt = (xs, ptIds, moddown) => {
+            const lev = B.lvl(...xs), N = p.N, l = lev + 1, m = xs.length, lk = l + p.k;
+            let kern = [kMac(2 * lk * N * m + 2 * lk * N * (m - 1))], pts;
+            if (o.otfPlaintexts) { kern = [kNtt(lk * m, N), kMac(lk * N * m), ...kern]; pts = ptIds.map(id => [id, N * 8]); }
+            else pts = ptIds.map(id => [id, lk * N * 8]);
+            const down = moddown ? ksTail(p, lev).slice(1) : [];
+            return B.emit('pmac', lev, xs, lev, [...kern, ...down], null, pts, moddown ? undefined : 2 * lk * N * 8);
+        };
+        B.hrotExt = (x, kid) => {
+            const lev = B.lvl(x), N = p.N, l = lev + 1;
+            const ks = [K('auto', 2 * l * N, 4 * l * N), ...ksModup(p, lev), ...B.seedKernels(lev), ...ksTail(p, lev).slice(0, 1)];
+            return B.emit('hrot', lev, [x], lev, ks, B.key(kid, lev), [], 2 * (l + p.k) * N * 8);
+        };
+        B.addExt = xs => {
+            const lev = B.lvl(...xs), N = p.N, lk = lev + 1 + p.k;
+            const kern = [kMac(2 * lk * N * Math.max(1, xs.length - 1)), ...ksTail(p, lev).slice(1), ...rescaleKernels(p, lev)];
+            return B.emit('add', lev, xs, lev - 1, kern);
+        };
         B.pmac = (xs, ptIds) => {
             const lev = B.lvl(...xs), N = p.N, l = lev + 1, m = xs.length;
             let kern = [kMac(2 * l * N * m + 2 * l * N * (m - 1))], pts;
@@ -1178,10 +1210,22 @@
         B.dft = (x, prefix, nLevels) => {
             const split = dftSplit(p.slotsLog, nLevels);
             for (let j = 0; j < split.length; j++) {
-                const k = split[j], d = 2 ** (k + 1) - 1, n1 = Math.min(2 ** cdiv(k + 1, 2), d), n2 = cdiv(d, n1), tag = `${prefix}${j}`;
+                const k = split[j], d = Math.min(2 ** (k + 1) - 1, 2 ** p.slotsLog), tag = `${prefix}${j}`;
+                const lazy = o.lazyModdown && o.hoisting && !o.minKs;
+                let n1;
+                if (lazy && d === p.slots) {
+                    const sl = p.slots, c = Math.floor(Math.sqrt(sl - 1)) + 1;     // ceil(sqrt(slots)), exact for these sizes
+                    n1 = sl > 1 ? Math.min(2 ** (c.toString(2).length - 1 + 1), d) : 1;
+                } else if (lazy) n1 = Math.min(2 ** (Math.floor(k / 2) + 1 + (d > 7 ? 1 : 0)), d);
+                else n1 = Math.min(2 ** cdiv(k + 1, 2), d);
+                const n2 = cdiv(d, n1);
                 const babies = [x];
                 if (n1 > 1) {
                     if (o.minKs) { for (let i = 1; i < n1; i++) babies.push(B.hrot(babies[babies.length - 1], `${tag}.b`)); }
+                    else if (o.hoisting && o.lazyModdown) {
+                        const dig = B.modup(x); babies[0] = B.extend(x);
+                        for (let i = 1; i < n1; i++) babies.push(B.hrotHoistedExt(x, dig, `${tag}.b${i}`));
+                    }
                     else if (o.hoisting) { const dig = B.modup(x); for (let i = 1; i < n1; i++) babies.push(B.hrotHoisted(x, dig, `${tag}.b${i}`)); }
                     else { for (let i = 1; i < n1; i++) babies.push(B.hrot(x, `${tag}.b${i}`)); }
                 }
@@ -1189,12 +1233,16 @@
                 for (let g = 0; g < n2; g++) {
                     const m = Math.min(n1, d - g * n1), ids = [];
                     for (let i = 0; i < m; i++) ids.push(`${tag}.d${g}.${i}`);
-                    inners.push(B.pmac(babies.slice(0, m), ids));
+                    inners.push(lazy && n1 > 1 ? B.pmacExt(babies.slice(0, m), ids, g > 0) : B.pmac(babies.slice(0, m), ids));
                 }
                 if (o.minKs) {
                     let acc = inners[inners.length - 1];
                     for (let g = n2 - 2; g >= 0; g--) acc = B.add([B.hrot(acc, `${tag}.g`), inners[g]], g === 0);
                     x = n2 > 1 ? acc : B.add([acc], true);
+                } else if (lazy && n1 > 1) {
+                    const parts = [inners[0]];
+                    for (let g = 1; g < n2; g++) parts.push(B.hrotExt(inners[g], `${tag}.g${g}`));
+                    x = B.addExt(parts);
                 } else {
                     const parts = [inners[0]];
                     for (let g = 1; g < n2; g++) parts.push(B.hrot(inners[g], `${tag}.g${g}`));
@@ -1236,7 +1284,7 @@
         return B;
     }
     function bootOptions(o) {
-        return Object.assign({ nBoot: 1, hoisting: true, minKs: false, seededKeys: false, otfPlaintexts: false }, o || {});
+        return Object.assign({ nBoot: 1, hoisting: true, minKs: false, seededKeys: false, otfPlaintexts: false, lazyModdown: false }, o || {});
     }
     function bootstrapTrace(p, opts) {
         const o = bootOptions(opts), B = Builder(p, o);
@@ -1705,7 +1753,7 @@
     }
 
     // ── convenience for the parity test and the deck ─────────────────
-    const camel = o => { const m = { n_boot: 'nBoot', min_ks: 'minKs', seeded_keys: 'seededKeys', otf_plaintexts: 'otfPlaintexts' }, out = {};
+    const camel = o => { const m = { n_boot: 'nBoot', min_ks: 'minKs', seeded_keys: 'seededKeys', otf_plaintexts: 'otfPlaintexts', lazy_moddown: 'lazyModdown' }, out = {};
         for (const [k, v] of Object.entries(o || {})) out[m[k] || k] = v; return out; };
     function simulateNamed(paramsName, hwName, opts, dvfs, hwOver) {
         const p = mkParams(PARAMS[paramsName]);
@@ -1723,7 +1771,7 @@
         const ids = ['sb-n','sb-l','sb-d','sb-c','sb-s','sb-r'];
         const NAMES = { modraise: 'ModRaise', cts: 'CoeffToSlot', evalmod: 'EvalMod', stc: 'SlotToCoeff' };
         function opts(){ const a = $('sb-alg').value;
-            return a === 'nohoist' ? { hoisting: false } : a === 'minks' ? { minKs: true } : a === 'all' ? { minKs: true, seededKeys: true, otfPlaintexts: true } : {}; }
+            return a === 'nohoist' ? { hoisting: false } : a === 'minks' ? { minKs: true } : a === 'lazy' ? { lazyModdown: true } : a === 'all' ? { minKs: true, seededKeys: true, otfPlaintexts: true } : {}; }
         function rec(){
             ids.forEach(id => $(id + '-val').textContent = $(id).value);
             const logN = +$('sb-n').value, L = +$('sb-l').value, dn = Math.min(+$('sb-d').value, L + 1);
@@ -1778,15 +1826,35 @@
         <tr><td><strong>Min-KS</strong> (ARK)</td><td>Apply baby and giant rotations iteratively by one fixed step, so a whole BSGS loop needs only 2 keys</td><td>CoeffToSlot keys: 43 &rarr; 7. Same rotation count, but hoisting is lost (more NTTs) and the rotations are serial</td></tr>
         <tr><td><strong>Seeded keys</strong></td><td>The uniform half of each evaluation key is regenerated on chip from a seed</td><td>Key bytes halved; some PRNG work on the multiply-add lanes</td></tr>
         <tr><td><strong>On-the-fly plaintexts</strong> (in the spirit of ARK's OF-Limb)</td><td>Generate DFT diagonals on chip from a compact form instead of loading them</td><td>Plaintext bytes drop to one limb each; adds NTTs</td></tr>
+        <tr><td><strong>OpenFHE's BSGS</strong> (lazy ModDown)</td><td>Keep rotations in the Q&middot;P basis, multiply plaintexts there, ModDown once per DFT level; then baby steps cost no NTTs, so use many more of them</td><td>A third fewer transforms (13,710 &rarr; 9,234) but 109 rotations instead of 85, and plaintexts stored with the special limbs: right for a CPU, wrong for a memory-bound accelerator (deck 05)</td></tr>
         <tr><td><strong>Level ordering</strong></td><td>SlotToCoeff first, at low levels</td><td>Cheaper DFT. Not modelled in the companion code; an exercise</td></tr>
         <tr><td><strong>Radix / level budget</strong></td><td>More DFT levels &rarr; fewer rotations</td><td>Fewer keys and bytes, fewer useful levels; use the interactive slide</td></tr>
     </table>
     </div>
-    <p>All four modelled techniques trade arithmetic for bytes. Whether that wins depends on whether the design is memory-bound or compute-bound, which is exactly what the simulator in deck 03 decides.</p>
+    <p>Min-KS, seeded keys and on-the-fly plaintexts trade arithmetic for bytes; OpenFHE's BSGS trades bytes for arithmetic. Whether that wins depends on whether the design is memory-bound or compute-bound, which is exactly what the simulator in deck 03 decides.</p>
 </section>
 
 <section class="slide" id="slide-12">
     <div class="slide-number">12</div>
+    <h2>Checked Against a Real OpenFHE Bootstrap</h2>
+    <p>OpenFHE v1.5.1 was instrumented (a 78-line patch) to log every NTT, base conversion, key switch, automorphism, rescale and plaintext multiply of a bootstrap. Below is N = 2<sup>14</sup>, 8,192 slots, level budget {3, 3}, dnum 3, against the model at the same parameters, run with the default (balanced) BSGS split and with OpenFHE's. Each cell reads <strong>OpenFHE / model / model with OpenFHE's BSGS</strong> (HMults: OpenFHE / model).</p>
+    <div class="table-wrap">
+    <table>
+        <tr><th>Stage</th><th>Rotations</th><th>HMults</th><th>NTT + iNTT limbs</th><th>Key GB requested</th></tr>
+        <tr><td>CoeffToSlot</td><td>46 / 35 / 51</td><td>&mdash;</td><td>2,419 / 5,151 / 2,025</td><td>1.45 / 1.13 / 1.64</td></tr>
+        <tr><td>EvalMod</td><td>&mdash;</td><td>48 / 56</td><td>20,411 / 11,816 / 11,816</td><td>1.05 / 1.28 / 1.28</td></tr>
+        <tr><td>SlotToCoeff</td><td>45 / 34 / 50</td><td>&mdash;</td><td>1,025 / 2,494 / 854</td><td>0.57 / 0.43 / 0.63</td></tr>
+    </table>
+    </div>
+    <ul>
+        <li><strong>Agrees exactly where the algorithms agree.</strong> Bootstrap depth is 20 in both, and in the N = 2<sup>16</sup>, 8-slot recording the 12 SubSum rotations match OpenFHE on keys and key bytes exactly, and on transforms to within 3%.</li>
+        <li><strong>The DFT split was the big difference.</strong> OpenFHE keeps rotated ciphertexts in the extended Q&middot;P basis and uses many more baby steps (16 against 8 per radix-2<sup>5</sup> level). Modelling that (slide 11) brings transforms to within 20%.</li>
+        <li><strong>EvalMod differs by library policy.</strong> OpenFHE's FLEXIBLEAUTO scaling rescales copies of each input before every multiplication: 542 polynomial rescales for 48 HMults, against 2 per HMult in the model. That roughly doubles its EvalMod transforms. An accelerator compiler would rescale once, so the model keeps that schedule and the difference is documented and tested.</li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-13">
+    <div class="slide-number">13</div>
     <h2>What to Take Away</h2>
     <ul>
         <li><strong>Four stages:</strong> ModRaise (cheap), CoeffToSlot and SlotToCoeff (homomorphic DFTs: rotations, distinct keys, plaintexts) and EvalMod (a polynomial: multiplications, one key).</li>
