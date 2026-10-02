@@ -782,6 +782,11 @@
             .ladder-row { grid-template-columns: 1fr; gap: 0.2rem; }
             .ladder-row .speed { text-align: left; }
         }
+        .concepts { background: var(--bg-card); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 0.75rem 1rem; margin-top: 1.25rem; font-size: 0.88rem; }
+        .concepts p { margin: 0 0 0.4rem; color: var(--text-secondary); }
+        .concepts .chips { display: flex; flex-wrap: wrap; gap: 0.35rem 0.5rem; }
+        .concepts .chips a { border: 1px solid var(--border); border-radius: 999px; padding: 0.1rem 0.6rem; text-decoration: none; font-size: 0.82rem; }
+        .concepts .chips a:hover { border-color: var(--accent); }
     </style>
 </head>
 <body>
@@ -829,6 +834,10 @@
         <li><a href="#slide-12">Checked Against a Real OpenFHE Bootstrap</a></li>
         <li><a href="#slide-13">What to Take Away</a></li>
     </ul>
+    <div class="concepts">
+        <p><strong>Concepts used here, and where they are explained.</strong> Each links to its <a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#glossary">series glossary</a> entry: a short explanation, then links to the slides that explain it in depth, in this series, the Cryptography decks or LLM Inference Simulators.</p>
+        <div class="chips"><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-ckks" title="The FHE scheme for approximate arithmetic on real or complex vectors. Values are encoded with a scale Δ; noise is treated as rounding error; each multiplication is followed by a rescale that consumes one level.">CKKS</a><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-levels" title="A multiplication squares the scale; rescale divides by a prime and drops a limb. So each multiplicative level costs one prime, the level of a ciphertext sets how much work every operation on it does, and level 0 cannot be multiplied.">Levels, scale and rescale</a><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-keyswitch" title="After a multiplication (relinearisation) or a rotation, part of the ciphertext is under the wrong key; key switching fixes it using an evaluation key (78–210 MiB for the N = 2^16 sets used here). It dominates the cost of FHE.">Key switching and evaluation keys</a><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-automorphism" title="Substituting X → X^(5^r) permutes a polynomial&#x27;s coefficients so that the packed slots rotate by r. The permutation is free of arithmetic, but the result needs a key switch with a rotation key specific to r.">Automorphism and slot rotation</a><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-packing" title="A CKKS ciphertext holds N/2 complex numbers in parallel &#x27;slots&#x27; (SIMD). Using fewer slots (sparse packing) shrinks the bootstrap&#x27;s DFTs but adds a SubSum of rotations.">Slots, packing and sparse packing</a><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-bootstrap" title="Evaluating decryption homomorphically to turn a level-0 ciphertext into one at a high level: ModRaise, CoeffToSlot, EvalMod, SlotToCoeff. It costs hundreds of key switches and gigabytes of keys.">Bootstrapping</a><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-modraise" title="Reinterprets a level-0 ciphertext modulo the full Q, which adds a multiple of q_0 the rest of bootstrapping must remove. Cheap: transforms only.">ModRaise</a><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-dft" title="The encoding transform and its inverse, evaluated homomorphically as a few sparse matrix-vector products (an FFT factorised into levels). Rotation- and key-heavy: the memory-bound part of bootstrapping.">CoeffToSlot and SlotToCoeff (homomorphic DFT)</a><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-bsgs" title="Evaluates a d-diagonal matrix with about 2√d rotations instead of d: n_1 baby-step rotations of the input, n_2 inner sums, and one giant-step rotation per sum.">Baby-step giant-step (BSGS)</a><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-hoisting" title="Several rotations of the same ciphertext share one decomposition and ModUp (Halevi and Shoup), saving NTTs; the rotation keys stay distinct.">Hoisting</a><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-evalmod" title="Approximates the modular reduction with a scaled cosine evaluated as a Chebyshev series (baby-step giant-step polynomial evaluation) followed by double-angle steps cos 2x = 2cos²x − 1. Multiplication-heavy, one key.">EvalMod: Chebyshev series and double angle</a><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-stcfirst" title="Running SlotToCoeff before ModRaise, on the nearly exhausted input: cheap keys, one EvalMod for real data, and its levels are not taken from the top. OpenFHE&#x27;s BTSlotsEncoding.">SlotToCoeff first</a><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-minks" title="Algorithmic ways to cut key and plaintext traffic: rotate iteratively by one step so a BSGS loop reuses one key (Min-KS, from ARK), regenerate half of each key from a seed, and generate DFT plaintexts on chip.">Min-KS, seeded keys and on-the-fly plaintexts</a><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-lazymoddown" title="Keeping rotated ciphertexts in the extended Q·P basis and doing one ModDown per DFT level, so baby steps cost no NTTs and many more of them are used. Fewer NTTs, more keys.">Lazy ModDown (OpenFHE's BSGS)</a><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-tas" title="Bootstrap time plus the multiplications it enables, divided by the levels left and the slots: the cost per useful operation. Used by ARK and the 100x GPU paper to compare different parameters.">Amortised time per slot (T<sub>A.S.</sub>)</a><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-flexauto" title="An OpenFHE mode that rescales automatically and lazily, before each multiplication, on copies of its inputs. Convenient for users; in a kernel trace it shows up as many extra rescales.">FLEXIBLEAUTO rescaling (OpenFHE)</a><a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#g-openfhe" title="An open-source FHE library (C++). Here it is used to calibrate timing, and an instrumented build records the kernel stream of real bootstraps.">OpenFHE</a></div>
+    </div>
 </section>
 
 <section class="slide" id="slide-01">
@@ -866,8 +875,8 @@
         <li><strong>Sparse packing:</strong> with fewer slots than N/2, a <em>SubSum</em> of log<sub>2</sub>(N/2 / slots) rotations follows. OpenFHE's 8-slot configuration in our calibration does 12 of them.</li>
     </ul>
     <div class="callout">
-        <div class="callout-label">Ordering variants</div>
-        <p>Some implementations run SlotToCoeff <em>first</em>, at the bottom of the level ladder, where ciphertexts are small and the DFT is cheap. The companion model uses the ModRaise &rarr; CoeffToSlot &rarr; EvalMod &rarr; SlotToCoeff order described in ARK. The ordering changes the levels at which the expensive rotations run, and so changes the byte counts.</p>
+        <div class="callout-label">Ordering variants: SlotToCoeff first</div>
+        <p>SlotToCoeff can run <em>first</em>, on the nearly exhausted input, before ModRaise (OpenFHE's <code>BTSlotsEncoding</code> option). Its rotations then use keys with few limbs, its levels are no longer taken from the top of the chain, and for real-valued data EvalMod runs once instead of twice. In the companion model (option <code>stc_first</code>) the ark-set bootstrap leaves 10 levels instead of 7 and takes 11.51 ms instead of 13.94 ms on the ARK-class design. OpenFHE's own StC-first trace shows the same shape (<code>examples/results.md</code> OpenFHE's own StC-first trace shows the same shape (<code>examples/results.md</code> &sect;19 in the code repo).sect;19 in the code repo).</p>
     </div>
 </section>
 
@@ -1043,7 +1052,7 @@
             <div class="control-row"><label for="sb-deg">EvalMod degree</label><select id="sb-deg"><option>15</option><option>31</option><option selected>59</option><option>88</option><option>119</option></select></div>
             <div class="control-row"><label for="sb-r">Double-angle steps</label><input type="range" id="sb-r" min="0" max="6" value="2"><span class="val" id="sb-r-val">2</span></div>
             <div class="control-row"><label for="sb-slots">Slots</label><select id="sb-slots"><option value="full" selected>full (N/2)</option><option value="3">8 (sparse)</option><option value="10">1,024</option></select></div>
-            <div class="control-row"><label for="sb-alg">Algorithm</label><select id="sb-alg" style="max-width:100%"><option value="base" selected>baseline</option><option value="nohoist">no hoisting</option><option value="minks">Min-KS</option><option value="lazy">OpenFHE's BSGS</option><option value="all">all three</option></select></div>
+            <div class="control-row"><label for="sb-alg">Algorithm</label><select id="sb-alg" style="max-width:100%"><option value="base" selected>baseline</option><option value="nohoist">no hoisting</option><option value="minks">Min-KS</option><option value="lazy">OpenFHE's BSGS</option><option value="stcfirst">SlotToCoeff first</option><option value="all">all three</option></select></div>
         </div>
         <div class="metric-grid" id="sb-m"></div>
         <div class="chart-title" style="margin-top:0.75rem;">per stage: limb transforms (green), key GB requested (orange), plaintext GB requested (teal); bars scaled to the largest value in each colour</div>
@@ -1213,8 +1222,8 @@
                 const k = split[j], d = Math.min(2 ** (k + 1) - 1, 2 ** p.slotsLog), tag = `${prefix}${j}`;
                 const lazy = o.lazyModdown && o.hoisting && !o.minKs;
                 let n1;
-                if (lazy && d === p.slots) {
-                    const sl = p.slots, c = Math.floor(Math.sqrt(sl - 1)) + 1;     // ceil(sqrt(slots)), exact for these sizes
+                if (lazy && d === 2 ** p.slotsLog) {
+                    const sl = 2 ** p.slotsLog, c = Math.floor(Math.sqrt(sl - 1)) + 1;     // ceil(sqrt(slots)), exact for these sizes
                     n1 = sl > 1 ? Math.min(2 ** (c.toString(2).length - 1 + 1), d) : 1;
                 } else if (lazy) n1 = Math.min(2 ** (Math.floor(k / 2) + 1 + (d > 7 ? 1 : 0)), d);
                 else n1 = Math.min(2 ** cdiv(k + 1, 2), d);
@@ -1270,7 +1279,19 @@
             for (let r = 0; r < p.doubleAngle; r++) y = B.hmult(y, y);
             return y;
         };
+        B.bootstrapStcFirst = x => {
+            if (B.levels[x] < p.stcLevels) throw new Error(`StC-first needs the input at level >= ${p.stcLevels}`);
+            B.stage = 'stc'; x = B.dft(x, 'stc', p.stcLevels);
+            if (!p.fullSlots) x = B.add([x, B.hrot(x, 'stcfirst.rep')]);
+            B.stage = 'modraise'; x = B.modraise(x);
+            B.stage = 'cts'; x = B.dft(x, 'cts', p.ctsLevels);
+            x = B.add([x, B.hrot(x, 'conj')]);
+            B.stage = 'evalmod'; x = B.evalmod(x);
+            if (B.levels[x] < 0) throw new Error(`${p.name}: bootstrapping needs more than L = ${p.L} levels`);
+            return x;
+        };
         B.bootstrap = x => {
+            if (o.stcFirst) return B.bootstrapStcFirst(x);
             B.stage = 'modraise'; x = B.modraise(x);
             B.stage = 'cts'; x = B.dft(x, 'cts', p.ctsLevels);
             const c = B.hrot(x, 'conj');
@@ -1284,11 +1305,11 @@
         return B;
     }
     function bootOptions(o) {
-        return Object.assign({ nBoot: 1, hoisting: true, minKs: false, seededKeys: false, otfPlaintexts: false, lazyModdown: false }, o || {});
+        return Object.assign({ nBoot: 1, hoisting: true, minKs: false, seededKeys: false, otfPlaintexts: false, lazyModdown: false, stcFirst: false }, o || {});
     }
     function bootstrapTrace(p, opts) {
         const o = bootOptions(opts), B = Builder(p, o);
-        for (let i = 0; i < o.nBoot; i++) { B.boot = i; B.bootstrap(B.externalCt(0)); }
+        for (let i = 0; i < o.nBoot; i++) { B.boot = i; B.bootstrap(B.externalCt(o.stcFirst ? p.stcLevels : 0)); }
         return { params: p, ops: B.ops, sizes: B.sizes, external: B.external, levels: B.levels, options: o };
     }
     function heOpTrace(p, op, level, n) {
@@ -1753,7 +1774,7 @@
     }
 
     // ── convenience for the parity test and the deck ─────────────────
-    const camel = o => { const m = { n_boot: 'nBoot', min_ks: 'minKs', seeded_keys: 'seededKeys', otf_plaintexts: 'otfPlaintexts', lazy_moddown: 'lazyModdown' }, out = {};
+    const camel = o => { const m = { n_boot: 'nBoot', min_ks: 'minKs', seeded_keys: 'seededKeys', otf_plaintexts: 'otfPlaintexts', lazy_moddown: 'lazyModdown', stc_first: 'stcFirst' }, out = {};
         for (const [k, v] of Object.entries(o || {})) out[m[k] || k] = v; return out; };
     function simulateNamed(paramsName, hwName, opts, dvfs, hwOver) {
         const p = mkParams(PARAMS[paramsName]);
@@ -1771,7 +1792,7 @@
         const ids = ['sb-n','sb-l','sb-d','sb-c','sb-s','sb-r'];
         const NAMES = { modraise: 'ModRaise', cts: 'CoeffToSlot', evalmod: 'EvalMod', stc: 'SlotToCoeff' };
         function opts(){ const a = $('sb-alg').value;
-            return a === 'nohoist' ? { hoisting: false } : a === 'minks' ? { minKs: true } : a === 'lazy' ? { lazyModdown: true } : a === 'all' ? { minKs: true, seededKeys: true, otfPlaintexts: true } : {}; }
+            return a === 'nohoist' ? { hoisting: false } : a === 'minks' ? { minKs: true } : a === 'lazy' ? { lazyModdown: true } : a === 'stcfirst' ? { stcFirst: true } : a === 'all' ? { minKs: true, seededKeys: true, otfPlaintexts: true } : {}; }
         function rec(){
             ids.forEach(id => $(id + '-val').textContent = $(id).value);
             const logN = +$('sb-n').value, L = +$('sb-l').value, dn = Math.min(+$('sb-d').value, L + 1);
@@ -1827,17 +1848,17 @@
         <tr><td><strong>Seeded keys</strong></td><td>The uniform half of each evaluation key is regenerated on chip from a seed</td><td>Key bytes halved; some PRNG work on the multiply-add lanes</td></tr>
         <tr><td><strong>On-the-fly plaintexts</strong> (in the spirit of ARK's OF-Limb)</td><td>Generate DFT diagonals on chip from a compact form instead of loading them</td><td>Plaintext bytes drop to one limb each; adds NTTs</td></tr>
         <tr><td><strong>OpenFHE's BSGS</strong> (lazy ModDown)</td><td>Keep rotations in the Q&middot;P basis, multiply plaintexts there, ModDown once per DFT level; then baby steps cost no NTTs, so use many more of them</td><td>A third fewer transforms (13,710 &rarr; 9,234) but 109 rotations instead of 85, and plaintexts stored with the special limbs: right for a CPU, wrong for a memory-bound accelerator (deck 05)</td></tr>
-        <tr><td><strong>Level ordering</strong></td><td>SlotToCoeff first, at low levels</td><td>Cheaper DFT. Not modelled in the companion code; an exercise</td></tr>
+        <tr><td><strong>SlotToCoeff first</strong></td><td>Run SlotToCoeff before ModRaise, on the nearly exhausted input</td><td>18 HMults instead of 36 (one EvalMod), 9,544 transforms instead of 13,710, keys 6.95 instead of 9.29 GB requested, and 10 levels left instead of 7. The only lever here that helps every design (deck 05)</td></tr>
         <tr><td><strong>Radix / level budget</strong></td><td>More DFT levels &rarr; fewer rotations</td><td>Fewer keys and bytes, fewer useful levels; use the interactive slide</td></tr>
     </table>
     </div>
-    <p>Min-KS, seeded keys and on-the-fly plaintexts trade arithmetic for bytes; OpenFHE's BSGS trades bytes for arithmetic. Whether that wins depends on whether the design is memory-bound or compute-bound, which is exactly what the simulator in deck 03 decides.</p>
+    <p>Min-KS, seeded keys and on-the-fly plaintexts trade arithmetic for bytes; OpenFHE's BSGS trades bytes for arithmetic; SlotToCoeff first saves both. Whether that wins depends on whether the design is memory-bound or compute-bound, which is exactly what the simulator in deck 03 decides.</p>
 </section>
 
 <section class="slide" id="slide-12">
     <div class="slide-number">12</div>
     <h2>Checked Against a Real OpenFHE Bootstrap</h2>
-    <p>OpenFHE v1.5.1 was instrumented (a 78-line patch) to log every NTT, base conversion, key switch, automorphism, rescale and plaintext multiply of a bootstrap. Below is N = 2<sup>14</sup>, 8,192 slots, level budget {3, 3}, dnum 3, against the model at the same parameters, run with the default (balanced) BSGS split and with OpenFHE's. Each cell reads <strong>OpenFHE / model / model with OpenFHE's BSGS</strong> (HMults: OpenFHE / model).</p>
+    <p>OpenFHE v1.5.1 was instrumented (an 82-line patch) to log every NTT, base conversion, key switch, automorphism, rescale and plaintext multiply of a bootstrap. Below is N = 2<sup>14</sup>, 8,192 slots, level budget {3, 3}, dnum 3, against the model at the same parameters, run with the default (balanced) BSGS split and with OpenFHE's. Each cell reads <strong>OpenFHE / model / model with OpenFHE's BSGS</strong> (HMults: OpenFHE / model).</p>
     <div class="table-wrap">
     <table>
         <tr><th>Stage</th><th>Rotations</th><th>HMults</th><th>NTT + iNTT limbs</th><th>Key GB requested</th></tr>
@@ -1871,7 +1892,7 @@
 
 <!-- ════════════════════════════════════ Footer ════════════════════════════════════ -->
 <footer class="footer">
-    <p>Part of the <a href="https://github.com/BrendanJamesLynskey/FHE_Hub_Accelerator_Simulators">FHE Accelerator Simulators series</a> &middot; code: <a href="https://github.com/BrendanJamesLynskey/FHE_Accelerator_Sim">FHE_Accelerator_Sim</a></p>
+    <p>Part of the <a href="https://github.com/BrendanJamesLynskey/FHE_Hub_Accelerator_Simulators">FHE Accelerator Simulators series</a> &middot; <a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/#glossary">glossary: every concept and where it is explained</a> &middot; code: <a href="https://github.com/BrendanJamesLynskey/FHE_Accelerator_Sim">FHE_Accelerator_Sim</a></p>
     <p style="margin-top: 0.5rem; font-size: 0.8rem;"><a href="https://brendanjameslynskey.github.io/FHESim_01_FHE_for_Hardware_Engineers/">&larr; 01 FHE for Hardware Engineers: CKKS as a Workload</a> &nbsp;&middot;&nbsp; <a href="https://brendanjameslynskey.github.io/FHESim_03_Simulating_an_FHE_Accelerator/">03 Simulating an FHE Accelerator &rarr;</a></p>
     <p style="margin-top: 0.5rem; font-size: 0.8rem;">FHE fundamentals: <a href="https://github.com/BrendanJamesLynskey/Mathematics#cryptography">the Cryptography section of the Mathematics hub</a> &middot; <a href="https://brendanjameslynskey.github.io/Cryptography/08-fully-homomorphic-encryption/">Cryptography 08: Fully Homomorphic Encryption</a> &middot; sister series: <a href="https://github.com/BrendanJamesLynskey/LLM_Hub_Inference_Simulators">LLM Inference Simulators</a></p>
 </footer>
